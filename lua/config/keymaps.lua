@@ -46,6 +46,12 @@ vim.keymap.set("n", "<leader>cc", function()
 end, { desc = "Claude Code (toggle)" })
 vim.keymap.set("n", "<leader>cC", "<cmd>split | terminal claude<cr>", { desc = "Claude Code (new)" })
 
+-- Remove LazyVim's lazygit log bindings (replaced by gitlineage.nvim)
+vim.keymap.del("n", "<leader>gl")
+vim.keymap.del("n", "<leader>gL")
+-- Remove LazyVim's git file history binding (replaced by diffview)
+vim.keymap.del("n", "<leader>gf")
+
 -- Inline git blame (skip diffview buffers)
 vim.keymap.set("n", "<leader>gb", function()
   local name = vim.api.nvim_buf_get_name(0)
@@ -55,6 +61,10 @@ vim.keymap.set("n", "<leader>gb", function()
   end
   Snacks.git.blame_line()
 end, { desc = "Git Blame Line" })
+
+vim.api.nvim_create_autocmd("CmdWinEnter", {
+  callback = function() vim.cmd("quit") end,
+})
 
 -- Exit terminal mode
 vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
