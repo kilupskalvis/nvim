@@ -4,6 +4,7 @@ return {
   lazy = false,
   opts = {
     default_file_explorer = true,
+    delete_to_trash = true,
     float = {
       padding = 2,
       max_width = 0.8,
