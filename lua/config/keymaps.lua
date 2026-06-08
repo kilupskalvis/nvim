@@ -87,3 +87,6 @@ vim.keymap.set("i", "<S-Tab>", "<C-d>", { desc = "Dedent line" })
 
 -- Exit terminal mode
 vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
+
+-- Toggle dark/light mode
+vim.keymap.set("n", "<leader>ut", "<cmd>CyberdreamToggleMode<cr>", { desc = "Toggle dark/light mode" })

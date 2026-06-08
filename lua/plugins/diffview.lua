@@ -18,6 +18,15 @@ return {
           end
         end
       end,
+      view_leave = function()
+        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+          if vim.api.nvim_buf_is_valid(buf) and not pre_bufs[buf] then
+            if vim.bo[buf].modified then
+              vim.bo[buf].modified = false
+            end
+          end
+        end
+      end,
       view_closed = function()
         vim.defer_fn(function()
           for _, buf in ipairs(vim.api.nvim_list_bufs()) do
