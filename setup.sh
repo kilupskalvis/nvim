@@ -226,24 +226,52 @@ ensure_npm_package() {
     return
   fi
   info "Installing $pkg globally via npm..."
-  npm install -g "$pkg"
+  if [[ "$PKG_MGR" == "brew" ]]; then
+    npm install -g "$pkg"
+  else
+    sudo npm install -g "$pkg"
+  fi
 }
 
-check_neovim() {
-  if ! command_exists nvim; then
-    warn "Neovim is not installed. Please install Neovim >= 0.10.0"
-    warn "See: https://github.com/neovim/neovim/blob/master/INSTALL.md"
-    return
+ensure_neovim() {
+  if command_exists nvim; then
+    local version
+    version=$(nvim --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+    local minor
+    minor=$(echo "$version" | cut -d. -f2)
+    if ((minor < 10)); then
+      warn "Neovim $version found, but >= 0.10.0 is required"
+    else
+      success "Neovim $version"
+      return
+    fi
   fi
-  local version
-  version=$(nvim --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-  local minor
-  minor=$(echo "$version" | cut -d. -f2)
-  if ((minor < 10)); then
-    warn "Neovim $version found, but >= 0.10.0 is recommended for LazyVim"
-  else
-    success "Neovim $version"
-  fi
+  info "Installing Neovim from GitHub releases..."
+  case "$OS" in
+  macos)
+    pkg_install neovim
+    ;;
+  linux)
+    local arch
+    case "$(uname -m)" in
+    x86_64) arch="x86_64" ;;
+    aarch64 | arm64) arch="aarch64" ;;
+    *) error "Unsupported architecture for Neovim: $(uname -m)" ;;
+    esac
+    local tmp
+    tmp=$(mktemp -d)
+    curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${arch}.tar.gz" -o "$tmp/nvim.tar.gz"
+    tar xzf "$tmp/nvim.tar.gz" -C "$tmp"
+    mkdir -p ~/.local
+    rm -rf ~/.local/nvim
+    mv "$tmp"/nvim-linux-"${arch}" ~/.local/nvim
+    ln -sf ~/.local/nvim/bin/nvim ~/.local/bin/nvim
+    rm -rf "$tmp"
+    if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+      warn "Add ~/.local/bin to your PATH"
+    fi
+    ;;
+  esac
 }
 
 # --- Smoke test ---
@@ -252,7 +280,7 @@ smoke_test() {
   echo ""
   info "Running smoke test..."
 
-  local tools=("curl" "unzip" "tar" "git" "rg" "node" "npm" "python3" "go" "rustc" "cargo")
+  local tools=("curl" "unzip" "tar" "git" "rg" "nvim" "node" "npm" "python3" "go" "rustc" "cargo")
   local failed=0
 
   for tool in "${tools[@]}"; do
@@ -323,6 +351,7 @@ main() {
   ensure_git
   ensure_ripgrep
   ensure_fd
+  ensure_neovim
   ensure_node
   ensure_python
   ensure_go
@@ -331,7 +360,6 @@ main() {
   ensure_npm_package eslint
 
   echo ""
-  check_neovim
   smoke_test
 
   echo ""
