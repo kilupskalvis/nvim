@@ -6,6 +6,7 @@ return {
   keys = {
     { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "Diffview Open" },
     { "<leader>gf", "<cmd>DiffviewFileHistory %<cr>", desc = "Diffview File History" },
+    { "<leader>gh", "<cmd>DiffviewFileHistory<cr>", desc = "Diffview Git Log" },
   },
   opts = {
     watch_index = true,

@@ -4,6 +4,12 @@ vim.keymap.set("n", "<leader>w<Down>", "<C-w>j", { desc = "Go to lower window" }
 vim.keymap.set("n", "<leader>w<Up>", "<C-w>k", { desc = "Go to upper window" })
 vim.keymap.set("n", "<leader>w<Right>", "<C-w>l", { desc = "Go to right window" })
 
+-- Move lines up/down
+vim.keymap.set("n", "<A-Up>", "<cmd>m .-2<cr>==", { desc = "Move line up" })
+vim.keymap.set("n", "<A-Down>", "<cmd>m .+1<cr>==", { desc = "Move line down" })
+vim.keymap.set("v", "<A-Up>", ":m '<-2<cr>gv=gv", { desc = "Move selection up" })
+vim.keymap.set("v", "<A-Down>", ":m '>+1<cr>gv=gv", { desc = "Move selection down" })
+
 -- Window resizing
 vim.keymap.set("n", "<A-S-Up>", "<cmd>resize +2<cr>", { desc = "Increase height" })
 vim.keymap.set("n", "<A-S-Down>", "<cmd>resize -2<cr>", { desc = "Decrease height" })
@@ -49,8 +55,7 @@ vim.keymap.set("n", "<leader>cC", "<cmd>split | terminal claude<cr>", { desc = "
 -- Remove LazyVim's lazygit log bindings (replaced by gitlineage.nvim)
 pcall(vim.keymap.del, "n", "<leader>gl")
 pcall(vim.keymap.del, "n", "<leader>gL")
--- Remove LazyVim's git file history binding (replaced by diffview)
-pcall(vim.keymap.del, "n", "<leader>gf")
+-- LazyVim's <leader>gf is overridden by diffview.lua keys spec
 
 -- Inline git blame (skip diffview buffers)
 vim.keymap.set("n", "<leader>gb", function()
