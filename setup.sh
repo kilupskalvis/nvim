@@ -166,34 +166,6 @@ ensure_fd() {
   esac
 }
 
-ensure_lazygit() {
-  if command_exists lazygit; then
-    success "lazygit already installed"
-    return
-  fi
-  info "Installing lazygit..."
-  case "$PKG_MGR" in
-  brew) pkg_install lazygit ;;
-  pacman) pkg_install lazygit ;;
-  apt | dnf)
-    # Install from GitHub releases
-    local version
-    version=$(curl -fsSL https://api.github.com/repos/jesseduffield/lazygit/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
-    local arch
-    case "$(uname -m)" in
-    x86_64) arch="x86_64" ;;
-    aarch64) arch="arm64" ;;
-    armv7l) arch="armv6" ;;
-    *) error "Unsupported architecture for lazygit: $(uname -m)" ;;
-    esac
-    local tmp
-    tmp=$(mktemp -d)
-    curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${version}/lazygit_${version}_Linux_${arch}.tar.gz" | tar xz -C "$tmp"
-    sudo install "$tmp/lazygit" /usr/local/bin/lazygit
-    rm -rf "$tmp"
-    ;;
-  esac
-}
 
 ensure_node() {
   if command_exists node && command_exists npm; then
@@ -246,6 +218,8 @@ ensure_rust() {
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
   source "${CARGO_HOME:-$HOME/.cargo}/env"
 }
+
+ensure_npm_package() {
   local pkg="$1"
   if npm list -g "$pkg" &>/dev/null; then
     success "$pkg (npm) already installed"
@@ -278,7 +252,7 @@ smoke_test() {
   echo ""
   info "Running smoke test..."
 
-  local tools=("curl" "unzip" "tar" "git" "rg" "node" "npm" "python3" "go" "rustc" "cargo" "lazygit")
+  local tools=("curl" "unzip" "tar" "git" "rg" "node" "npm" "python3" "go" "rustc" "cargo")
   local failed=0
 
   for tool in "${tools[@]}"; do
@@ -349,7 +323,6 @@ main() {
   ensure_git
   ensure_ripgrep
   ensure_fd
-  ensure_lazygit
   ensure_node
   ensure_python
   ensure_go

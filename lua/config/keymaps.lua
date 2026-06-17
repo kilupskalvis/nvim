@@ -52,10 +52,13 @@ vim.keymap.set("n", "<leader>cc", function()
 end, { desc = "Claude Code (toggle)" })
 vim.keymap.set("n", "<leader>cC", "<cmd>split | terminal claude<cr>", { desc = "Claude Code (new)" })
 
--- Remove LazyVim's lazygit log bindings (replaced by gitlineage.nvim)
+-- Remove LazyVim's git bindings (replaced by diffview + gitlineage + snacks.blame_line)
+pcall(vim.keymap.del, "n", "<leader>gg")
+pcall(vim.keymap.del, "n", "<leader>gG")
 pcall(vim.keymap.del, "n", "<leader>gl")
 pcall(vim.keymap.del, "n", "<leader>gL")
--- LazyVim's <leader>gf is overridden by diffview.lua keys spec
+pcall(vim.keymap.del, "n", "<leader>gf")
+pcall(vim.keymap.del, "n", "<leader>gb")
 
 -- Inline git blame (skip diffview buffers)
 vim.keymap.set("n", "<leader>gb", function()

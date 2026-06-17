@@ -60,6 +60,7 @@ return {
           end)
         end,
       },
+      lazygit = { enabled = false },
       scroll = { enabled = true },
       explorer = { enabled = false },
       picker = {
