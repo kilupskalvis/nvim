@@ -59,6 +59,49 @@ return {
         { "n", "q", "<cmd>DiffviewClose<cr>", { desc = "Close Diffview" } },
         {
           "n",
+          "d",
+          function()
+            local lib = require("diffview.lib")
+            local view = lib.get_current_view()
+            if not view then return end
+
+            local item = view:infer_cur_file(true)
+            if not item then return end
+
+            local is_dir = type(item.collapsed) == "boolean"
+            local prompt = is_dir
+              and ("Discard all changes in %s/?"):format(item.path)
+              or ("Discard changes to %s?"):format(item.path)
+
+            if vim.fn.confirm(prompt, "&Yes\n&No", 2) ~= 1 then return end
+
+            local function discard_path(path, kind)
+              local toplevel = view.adapter.ctx.toplevel
+              if kind == "staged" then
+                vim.fn.system({ "git", "-C", toplevel, "reset", "HEAD", "--", path })
+              else
+                vim.fn.system({ "git", "-C", toplevel, "checkout", "--", path })
+              end
+            end
+
+            if is_dir then
+              local node = item._node
+              if node then
+                node:deep_some(function(n)
+                  if n.data and n.data.path and not n:has_children() then
+                    discard_path(n.data.path, n.data.kind)
+                  end
+                end)
+              end
+            else
+              discard_path(item.path, item.kind)
+            end
+            view:update_files()
+          end,
+          { desc = "Discard file/directory changes" },
+        },
+        {
+          "n",
           "gf",
           function()
             require("diffview.actions").goto_file_tab()

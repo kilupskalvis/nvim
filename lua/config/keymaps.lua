@@ -36,6 +36,18 @@ vim.keymap.set("n", "<leader>d", function() Snacks.bufdelete() end, { desc = "De
 vim.keymap.set("n", "<leader><Left>", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
 vim.keymap.set("n", "<leader><Right>", "<cmd>bnext<cr>", { desc = "Next buffer" })
 
+-- Line start/end navigation
+vim.keymap.set({ "n", "v" }, "<M-S-Left>", "^", { desc = "Start of line" })
+vim.keymap.set({ "n", "v" }, "<M-S-Right>", "$", { desc = "End of line" })
+vim.keymap.set("i", "<M-S-Left>", "<C-o>^", { desc = "Start of line" })
+vim.keymap.set("i", "<M-S-Right>", "<C-o>$", { desc = "End of line" })
+
+-- Top/bottom of file
+vim.keymap.set({ "n", "v" }, "<M-S-Up>", "gg", { desc = "Top of file" })
+vim.keymap.set({ "n", "v" }, "<M-S-Down>", "G", { desc = "Bottom of file" })
+vim.keymap.set("i", "<M-S-Up>", "<C-o>gg", { desc = "Top of file" })
+vim.keymap.set("i", "<M-S-Down>", "<C-o>G", { desc = "Bottom of file" })
+
 -- Make Ctrl+Z undo
 vim.keymap.set("n", "<C-z>", "u", { noremap = true })
 
