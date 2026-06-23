@@ -129,6 +129,44 @@ return {
   },
   config = function(_, opts)
     require("diffview").setup(opts)
+
+    local Layout = require("diffview.scene.layout")
+    local async = require("diffview.async")
+    local await = async.await
+
+    Layout.open_files = async.void(function(self)
+      if not self:is_valid() then return end
+
+      if #self:files() < #self.windows then
+        self:open_null()
+        self.emitter:emit("files_opened")
+        return
+      end
+
+      vim.cmd("diffoff!")
+
+      if not self:is_files_loaded() then
+        self:open_null()
+        for _, win in ipairs(self.windows) do
+          if not self:is_valid() then return end
+          await(win:load_file())
+        end
+      end
+
+      if not self:is_valid() then return end
+      await(async.scheduler())
+
+      if not self:is_valid() then return end
+      for _, win in ipairs(self.windows) do
+        if not self:is_valid() then return end
+        await(win:open_file())
+      end
+
+      if not self:is_valid() then return end
+      self:sync_scroll()
+      self.emitter:emit("files_opened")
+    end)
+
     vim.api.nvim_create_autocmd("BufWritePost", {
       callback = function()
         local lib = require("diffview.lib")
