@@ -90,28 +90,27 @@ return {
 
             if vim.fn.confirm(prompt, "&Yes\n&No", 2) ~= 1 then return end
 
-            local function discard_path(path, kind)
-              local toplevel = view.adapter.ctx.toplevel
-              if kind == "staged" then
-                vim.fn.system({ "git", "-C", toplevel, "reset", "HEAD", "--", path })
-              else
-                vim.fn.system({ "git", "-C", toplevel, "checkout", "--", path })
-              end
-            end
-
+            local paths = {}
             if is_dir then
               local node = item._node
               if node then
                 node:deep_some(function(n)
                   if n.data and n.data.path and not n:has_children() then
-                    discard_path(n.data.path, n.data.kind)
+                    table.insert(paths, { path = n.data.path, kind = n.data.kind })
                   end
                 end)
               end
             else
-              discard_path(item.path, item.kind)
+              table.insert(paths, { path = item.path, kind = item.kind })
             end
-            view:update_files()
+
+            local async = require("diffview.async")
+            async.void(function()
+              for _, p in ipairs(paths) do
+                require("diffview.async").await(view.adapter:file_restore(p.path, p.kind, nil))
+              end
+              view:update_files()
+            end)()
           end,
           { desc = "Discard file/directory changes" },
         },
