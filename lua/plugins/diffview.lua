@@ -1,4 +1,4 @@
-local state = { active = false, pre_bufs = {} }
+local state = { active = false, pre_bufs = {}, from_history = false }
 
 local function goto_file_in_tab()
   require("diffview.actions").goto_file_tab()
@@ -67,11 +67,35 @@ return {
     },
     keymaps = {
       view = {
-        { "n", "q", "<cmd>DiffviewClose<cr>", { desc = "Close Diffview" } },
+        {
+          "n",
+          "q",
+          function()
+            local back = state.from_history
+            state.from_history = false
+            vim.cmd("DiffviewClose")
+            if back then
+              vim.schedule(function() vim.cmd("DiffviewFileHistory") end)
+            end
+          end,
+          { desc = "Close Diffview" },
+        },
         { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
       },
       file_panel = {
-        { "n", "q", "<cmd>DiffviewClose<cr>", { desc = "Close Diffview" } },
+        {
+          "n",
+          "q",
+          function()
+            local back = state.from_history
+            state.from_history = false
+            vim.cmd("DiffviewClose")
+            if back then
+              vim.schedule(function() vim.cmd("DiffviewFileHistory") end)
+            end
+          end,
+          { desc = "Close Diffview" },
+        },
         {
           "n",
           "d",
@@ -119,6 +143,26 @@ return {
       file_history_panel = {
         { "n", "q", "<cmd>DiffviewClose<cr>", { desc = "Close Diffview" } },
         { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
+        {
+          "n",
+          "gd",
+          function()
+            local lib = require("diffview.lib")
+            local view = lib.get_current_view()
+            if not view or not view.panel then return end
+            local item = view.panel:get_item_at_cursor()
+            if not item then return end
+            local commit = item.commit or (item.parent and item.parent.commit)
+            if not commit then return end
+            local hash = commit.hash
+            state.from_history = true
+            vim.cmd("DiffviewClose")
+            vim.schedule(function()
+              vim.cmd("DiffviewOpen " .. hash .. "^.." .. hash)
+            end)
+          end,
+          { desc = "Open commit in Diffview" },
+        },
       },
     },
   },
