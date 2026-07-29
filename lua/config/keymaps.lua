@@ -99,9 +99,11 @@ vim.keymap.set("i", "<S-Down>", "<C-o>20<Down>", { desc = "Move 20 lines down" }
 vim.keymap.set({ "n", "i", "v" }, "<S-ScrollWheelUp>", "<C-y><C-y><C-y>", { desc = "Shift+Scroll Up (slow)" })
 vim.keymap.set({ "n", "i", "v" }, "<S-ScrollWheelDown>", "<C-e><C-e><C-e>", { desc = "Shift+Scroll Down (slow)" })
 
--- Toggle comment with Ctrl+/
+-- Toggle comment with Ctrl+/ (terminals often send C-_ for C-/)
 vim.keymap.set("v", "<C-/>", "gcgv", { remap = true, desc = "Toggle comment" })
 vim.keymap.set("n", "<C-/>", "gcc", { remap = true, desc = "Toggle comment line" })
+vim.keymap.set("v", "<C-_>", "gcgv", { remap = true, desc = "Toggle comment" })
+vim.keymap.set("n", "<C-_>", "gcc", { remap = true, desc = "Toggle comment line" })
 
 -- Indent/dedent with Tab/Shift+Tab
 vim.keymap.set("v", "<Tab>", function() vim.cmd("silent! normal! >gv") end, { desc = "Indent selection" })

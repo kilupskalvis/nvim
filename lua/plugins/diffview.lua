@@ -81,6 +81,7 @@ return {
           { desc = "Close Diffview" },
         },
         { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
+        { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
       },
       file_panel = {
         {
@@ -139,10 +140,12 @@ return {
           { desc = "Discard file/directory changes" },
         },
         { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
+        { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
       },
       file_history_panel = {
         { "n", "q", "<cmd>DiffviewClose<cr>", { desc = "Close Diffview" } },
         { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
+        { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
         {
           "n",
           "gd",
@@ -205,6 +208,14 @@ return {
       self:sync_scroll()
       self.emitter:emit("files_opened")
     end)
+
+    vim.api.nvim_create_autocmd("VimLeavePre", {
+      callback = function()
+        if state.active then
+          vim.cmd("DiffviewClose")
+        end
+      end,
+    })
 
     vim.api.nvim_create_autocmd("BufWritePost", {
       callback = function()

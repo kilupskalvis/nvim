@@ -1,15 +1,7 @@
 return {
   { "catppuccin/nvim", enabled = false },
   { "folke/tokyonight.nvim", enabled = false },
-  {
-    "folke/which-key.nvim",
-    opts = {
-      defaults = {},
-      spec = {
-        { "<leader>d", hidden = true },
-      },
-    },
-  },
+  { "folke/which-key.nvim", enabled = false },
   {
     "folke/snacks.nvim",
     keys = {
