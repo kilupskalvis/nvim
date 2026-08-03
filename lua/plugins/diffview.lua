@@ -172,7 +172,7 @@ return {
   config = function(_, opts)
     require("diffview").setup(opts)
 
-    local Layout = require("diffview.scene.layout")
+    local Layout = require("diffview.scene.layout").Layout
     local async = require("diffview.async")
     local await = async.await
 
