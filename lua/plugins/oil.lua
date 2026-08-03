@@ -56,12 +56,15 @@ return {
     -- Redirect it into a float to keep a consistent UX.
     vim.api.nvim_create_autocmd("BufWinEnter", {
       pattern = "oil://*",
-      callback = function()
+      callback = function(args)
         local win = vim.api.nvim_get_current_win()
         if vim.api.nvim_win_get_config(win).relative == "" then
+          -- Capture the dir before bdelete; afterwards the current buffer is
+          -- unnamed and open_float() would fall back to the cwd.
+          local dir = require("oil").get_current_dir(args.buf)
           vim.schedule(function()
             vim.cmd.bdelete()
-            require("oil").open_float()
+            require("oil").open_float(dir)
           end)
         end
       end,
