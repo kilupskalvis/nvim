@@ -1,5 +1,85 @@
 local state = { active = false, pre_bufs = {}, from_history = false }
 
+-- A modified buffer with one of these makes `:tabclose` fail with E445, since
+-- it cannot be hidden even though 'hidden' is set.
+local BLOCKING_BUFHIDDEN = { wipe = true, delete = true, unload = true }
+
+-- Make blocking buffers hideable so the tab can close. `modified` is left
+-- alone, so nothing unsaved is discarded.
+local function unblock_tabclose(tabpage)
+  local fixed = {}
+  if not (tabpage and vim.api.nvim_tabpage_is_valid(tabpage)) then return fixed end
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    local bufhidden = vim.bo[buf].bufhidden
+    if vim.bo[buf].modified and BLOCKING_BUFHIDDEN[bufhidden] then
+      vim.bo[buf].bufhidden = "hide"
+      table.insert(fixed, ("buf %d bufhidden=%s -> hide (%s)"):format(
+        buf, bufhidden, vim.api.nvim_buf_get_name(buf)))
+    end
+  end
+  return fixed
+end
+
+local function describe_tab(tabpage)
+  if not (tabpage and vim.api.nvim_tabpage_is_valid(tabpage)) then
+    return { "  <invalid tabpage: " .. tostring(tabpage) .. ">" }
+  end
+  local curwin = vim.api.nvim_get_current_win()
+  local lines = {}
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    local buftype = vim.bo[buf].buftype
+    -- nvim's `bufIsChanged` (what E445 tests) ignores `modified` for these.
+    local dontwrite = buftype == "nofile" or buftype == "nowrite"
+      or buftype == "terminal" or buftype == "prompt"
+    table.insert(lines, ("  win %d%s buf %d mod=%s counts_as_changed=%s bufhidden=%q buftype=%q ft=%q float=%s pre_buf=%s nwins=%d name=%s"):format(
+      win, win == curwin and " (cur)" or "", buf, tostring(vim.bo[buf].modified),
+      tostring(vim.bo[buf].modified and not dontwrite), vim.bo[buf].bufhidden, buftype,
+      vim.bo[buf].filetype, tostring(vim.api.nvim_win_get_config(win).relative ~= ""),
+      tostring(state.pre_bufs[buf] == true), #vim.fn.win_findbuf(buf),
+      vim.api.nvim_buf_get_name(buf)))
+  end
+  return lines
+end
+
+-- Close the view. If the close fails (E445 and friends), log which buffer
+-- blocked it, unblock it, and retry once.
+local function close_view()
+  local back = state.from_history
+  state.from_history = false
+
+  local view = require("diffview.lib").get_current_view()
+  local tabpage = view and view.tabpage
+  local ok, err = pcall(vim.cmd, "DiffviewClose")
+
+  if not ok then
+    local report = { "DiffviewClose failed: " .. tostring(err) }
+    table.insert(report, ("hidden=%s"):format(tostring(vim.o.hidden)))
+    table.insert(report, "view tabpage windows AT view_leave (just before :tabclose):")
+    vim.list_extend(report, state.leave_snapshot or { "  <no snapshot>" })
+    table.insert(report, "view tabpage windows AFTER the failure:")
+    vim.list_extend(report, describe_tab(tabpage))
+    table.insert(report, "current tabpage windows:")
+    vim.list_extend(report, describe_tab(vim.api.nvim_get_current_tabpage()))
+
+    local fixed = unblock_tabclose(tabpage)
+    vim.list_extend(fixed, unblock_tabclose(vim.api.nvim_get_current_tabpage()))
+    table.insert(report, "unblocked: " .. (next(fixed) and table.concat(fixed, ", ") or "nothing"))
+
+    local ok2, err2 = pcall(vim.cmd, "DiffviewClose")
+    table.insert(report, "retry ok=" .. tostring(ok2) .. (ok2 and "" or (" err=" .. tostring(err2))))
+
+    local logfile = vim.fs.joinpath(vim.fn.stdpath("state"), "diffview-close-failure.log")
+    pcall(vim.fn.writefile, vim.split(table.concat(report, "\n"), "\n"), logfile)
+    vim.notify(table.concat(report, "\n") .. "\nlogged to " .. logfile, vim.log.levels.WARN)
+  end
+
+  if back then
+    vim.schedule(function() vim.cmd("DiffviewFileHistory") end)
+  end
+end
+
 local function goto_file_in_tab()
   require("diffview.actions").goto_file_tab()
   local tab = vim.api.nvim_get_current_tabpage()
@@ -41,7 +121,7 @@ return {
           end
         end
       end,
-      view_leave = function()
+      view_leave = function(view)
         for _, buf in ipairs(vim.api.nvim_list_bufs()) do
           if vim.api.nvim_buf_is_valid(buf) and not state.pre_bufs[buf] then
             if vim.bo[buf].modified then
@@ -49,6 +129,16 @@ return {
             end
           end
         end
+        -- This runs immediately before diffview's :tabclose, so it is the only
+        -- place that sees the state the close actually fails on.
+        local tabpage = view and view.tabpage
+        state.leave_snapshot = describe_tab(tabpage)
+
+        -- Pre-existing buffers keep their `modified` flag (it may be real
+        -- unsaved work), but a modified buffer that can't be hidden makes the
+        -- upcoming :tabclose fail with E445. Making it hideable lets the tab
+        -- close while the changes stay in the buffer.
+        unblock_tabclose(tabpage)
       end,
       view_closed = function()
         state.active = false
@@ -70,14 +160,7 @@ return {
         {
           "n",
           "q",
-          function()
-            local back = state.from_history
-            state.from_history = false
-            vim.cmd("DiffviewClose")
-            if back then
-              vim.schedule(function() vim.cmd("DiffviewFileHistory") end)
-            end
-          end,
+          close_view,
           { desc = "Close Diffview" },
         },
         { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
@@ -87,14 +170,7 @@ return {
         {
           "n",
           "q",
-          function()
-            local back = state.from_history
-            state.from_history = false
-            vim.cmd("DiffviewClose")
-            if back then
-              vim.schedule(function() vim.cmd("DiffviewFileHistory") end)
-            end
-          end,
+          close_view,
           { desc = "Close Diffview" },
         },
         {
@@ -143,7 +219,7 @@ return {
         { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
       },
       file_history_panel = {
-        { "n", "q", "<cmd>DiffviewClose<cr>", { desc = "Close Diffview" } },
+        { "n", "q", close_view, { desc = "Close Diffview" } },
         { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
         { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
         {
