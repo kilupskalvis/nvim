@@ -1,5 +1,14 @@
 return {
   {
+    -- H/L are remapped to word motions in lua/config/keymaps.lua. Buffer
+    -- cycling stays on [b / ]b and <leader><Left> / <leader><Right>.
+    "akinsho/bufferline.nvim",
+    keys = {
+      { "<S-h>", false },
+      { "<S-l>", false },
+    },
+  },
+  {
     "gbprod/yanky.nvim",
     keys = {
       { "d", [["_d]], mode = { "n", "v" }, desc = "Delete (black hole)" },

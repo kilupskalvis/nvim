@@ -10,24 +10,9 @@ vim.keymap.set("n", "<A-Down>", "<cmd>m .+1<cr>==", { desc = "Move line down" })
 vim.keymap.set("v", "<A-Up>", ":m '<-2<cr>gv=gv", { desc = "Move selection up" })
 vim.keymap.set("v", "<A-Down>", ":m '>+1<cr>gv=gv", { desc = "Move selection down" })
 
--- Window resizing
-vim.keymap.set("n", "<A-S-Up>", "<cmd>resize +2<cr>", { desc = "Increase height" })
-vim.keymap.set("n", "<A-S-Down>", "<cmd>resize -2<cr>", { desc = "Decrease height" })
-vim.keymap.set("n", "<A-S-Left>", "<cmd>vertical resize -2<cr>", { desc = "Decrease width" })
-vim.keymap.set("n", "<A-S-Right>", "<cmd>vertical resize +2<cr>", { desc = "Increase width" })
-
--- Disable hjkl in regular file buffers
-vim.api.nvim_create_autocmd("BufEnter", {
-  callback = function()
-    if vim.bo.buftype == "" and vim.bo.filetype ~= "oil" then
-      local opts = { noremap = true, buffer = true, silent = true }
-      vim.keymap.set("n", "h", "<Nop>", opts)
-      vim.keymap.set("n", "j", "<Nop>", opts)
-      vim.keymap.set("n", "k", "<Nop>", opts)
-      vim.keymap.set("n", "l", "<Nop>", opts)
-    end
-  end,
-})
+-- Window resizing is provided by LazyVim on <C-Up>/<C-Down>/<C-Left>/<C-Right>.
+-- Don't map it to <A-S-Arrow> here: <A-...> and <M-...> are the same key, so
+-- those would collide with the <M-S-Arrow> motions further down.
 
 -- Buffer management
 vim.keymap.set("n", "<leader>d", function() Snacks.bufdelete() end, { desc = "Delete buffer", nowait = true })
@@ -36,17 +21,26 @@ vim.keymap.set("n", "<leader>d", function() Snacks.bufdelete() end, { desc = "De
 vim.keymap.set("n", "<leader><Left>", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
 vim.keymap.set("n", "<leader><Right>", "<cmd>bnext<cr>", { desc = "Next buffer" })
 
--- Line start/end navigation
+-- Line start/end navigation. <M-S-h> normalises to <M-H>, which is a distinct
+-- key from <M-h>, so the hjkl variants can sit alongside the arrows.
 vim.keymap.set({ "n", "v" }, "<M-S-Left>", "^", { desc = "Start of line" })
 vim.keymap.set({ "n", "v" }, "<M-S-Right>", "$", { desc = "End of line" })
+vim.keymap.set({ "n", "v" }, "<M-H>", "^", { desc = "Start of line" })
+vim.keymap.set({ "n", "v" }, "<M-L>", "$", { desc = "End of line" })
 vim.keymap.set("i", "<M-S-Left>", "<C-o>^", { desc = "Start of line" })
 vim.keymap.set("i", "<M-S-Right>", "<C-o>$", { desc = "End of line" })
+vim.keymap.set("i", "<M-H>", "<C-o>^", { desc = "Start of line" })
+vim.keymap.set("i", "<M-L>", "<C-o>$", { desc = "End of line" })
 
 -- Top/bottom of file
 vim.keymap.set({ "n", "v" }, "<M-S-Up>", "gg", { desc = "Top of file" })
 vim.keymap.set({ "n", "v" }, "<M-S-Down>", "G", { desc = "Bottom of file" })
+vim.keymap.set({ "n", "v" }, "<M-K>", "gg", { desc = "Top of file" })
+vim.keymap.set({ "n", "v" }, "<M-J>", "G", { desc = "Bottom of file" })
 vim.keymap.set("i", "<M-S-Up>", "<C-o>gg", { desc = "Top of file" })
 vim.keymap.set("i", "<M-S-Down>", "<C-o>G", { desc = "Bottom of file" })
+vim.keymap.set("i", "<M-K>", "<C-o>gg", { desc = "Top of file" })
+vim.keymap.set("i", "<M-J>", "<C-o>G", { desc = "Bottom of file" })
 
 -- Ctrl+Backspace deletes word back (like Ctrl+W)
 vim.keymap.set("i", "<C-BS>", "<C-w>", { desc = "Delete word back" })
@@ -94,6 +88,45 @@ vim.keymap.set({ "n", "v" }, "<S-Up>", "20<Up>", { desc = "Move 20 lines up" })
 vim.keymap.set({ "n", "v" }, "<S-Down>", "20<Down>", { desc = "Move 20 lines down" })
 vim.keymap.set("i", "<S-Up>", "<C-o>20<Up>", { desc = "Move 20 lines up" })
 vim.keymap.set("i", "<S-Down>", "<C-o>20<Down>", { desc = "Move 20 lines down" })
+
+-- hjkl equivalent of Shift+Arrows. There is no distinct <S-j>/<S-k> key: Shift
+-- on a letter just yields the uppercase letter, so this takes over J (join
+-- lines) and K (LSP hover).
+vim.keymap.set({ "n", "v" }, "J", "20j", { desc = "Move 20 lines down" })
+vim.keymap.set({ "n", "v" }, "K", "20k", { desc = "Move 20 lines up" })
+
+-- hjkl equivalent of <S-Left>/<S-Right>, which vim defines as b/w. Takes over
+-- LazyVim's bufferline H/L (disabled in lua/plugins/keymaps.lua); buffer
+-- cycling is still on [b / ]b and <leader><Left> / <leader><Right>.
+vim.keymap.set({ "n", "v" }, "H", "b", { desc = "Previous word" })
+vim.keymap.set({ "n", "v" }, "L", "w", { desc = "Next word" })
+
+-- Hover moves off K. Two things map K to hover and both must be handled:
+--   * LazyVim/snacks -- disabled via the `["*"].keys` entry in lua/plugins/lsp.lua
+--     (it re-applies on a 100ms debounce, so deleting it after the fact loses).
+--   * Neovim itself -- lsp.lua only sets K when no mapping exists yet
+--     (`maparg('K') == ''`), and the LSP often attaches before this file loads,
+--     so drop its buffer-local map below.
+vim.keymap.set("n", "<leader>k", vim.lsp.buf.hover, { desc = "Hover" })
+local function drop_default_hover_key(buf)
+  vim.schedule(function()
+    if not vim.api.nvim_buf_is_valid(buf) then return end
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(buf, "n")) do
+      if map.lhs == "K" and map.desc == "vim.lsp.buf.hover()" then
+        pcall(vim.keymap.del, "n", "K", { buffer = buf })
+      end
+    end
+  end)
+end
+vim.api.nvim_create_autocmd("LspAttach", {
+  callback = function(args) drop_default_hover_key(args.buf) end,
+})
+-- Buffers an LSP already attached to before this file loaded get no LspAttach.
+for _, client in ipairs(vim.lsp.get_clients()) do
+  for buf in pairs(client.attached_buffers or {}) do
+    drop_default_hover_key(buf)
+  end
+end
 
 -- Tame Shift+Scroll to scroll 3 lines instead of a full page
 vim.keymap.set({ "n", "i", "v" }, "<S-ScrollWheelUp>", "<C-y><C-y><C-y>", { desc = "Shift+Scroll Up (slow)" })
