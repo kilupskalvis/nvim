@@ -78,11 +78,12 @@ end, { desc = "Claude Code (toggle)" })
 vim.keymap.set("n", "<leader>cC", "<cmd>split | terminal claude<cr>", { desc = "Claude Code (new)" })
 
 -- Remove LazyVim's git bindings (replaced by diffview + gitlineage + snacks.blame_line)
+-- Note: don't delete keys that a plugin spec also claims. lazy.nvim registers
+-- plugin `keys` at startup and this file runs later on VeryLazy, so deleting
+-- <leader>gf here removed diffview's own File History binding, not LazyVim's.
 pcall(vim.keymap.del, "n", "<leader>gg")
 pcall(vim.keymap.del, "n", "<leader>gG")
-pcall(vim.keymap.del, "n", "<leader>gl")
 pcall(vim.keymap.del, "n", "<leader>gL")
-pcall(vim.keymap.del, "n", "<leader>gf")
 pcall(vim.keymap.del, "n", "<leader>gb")
 
 -- Inline git blame (skip diffview buffers)
