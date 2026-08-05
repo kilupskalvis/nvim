@@ -3,6 +3,21 @@ return {
   { "folke/tokyonight.nvim", enabled = false },
   { "folke/which-key.nvim", enabled = false },
   {
+    -- Dashboard shortcuts are bare letters, so the default `g` (Find Text) is
+    -- what runs when <leader>g times out there, instead of reaching the git
+    -- bindings like <leader>gd / <leader>gh. Grep is on <leader>/ and
+    -- <leader>sg anyway, so drop the dashboard entry.
+    "folke/snacks.nvim",
+    opts = function(_, opts)
+      local keys = vim.tbl_get(opts, "dashboard", "preset", "keys")
+      if keys then
+        opts.dashboard.preset.keys = vim.tbl_filter(function(item)
+          return item.key ~= "g"
+        end, keys)
+      end
+    end,
+  },
+  {
     "folke/snacks.nvim",
     keys = {
       -- Disable snacks explorer (replaced by oil.nvim)
