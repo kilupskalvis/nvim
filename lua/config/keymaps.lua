@@ -1,8 +1,24 @@
--- Window navigation
+-- Window navigation (also on LazyVim's <C-h>/<C-j>/<C-k>/<C-l>)
 vim.keymap.set("n", "<leader>w<Left>", "<C-w>h", { desc = "Go to left window" })
 vim.keymap.set("n", "<leader>w<Down>", "<C-w>j", { desc = "Go to lower window" })
 vim.keymap.set("n", "<leader>w<Up>", "<C-w>k", { desc = "Go to upper window" })
 vim.keymap.set("n", "<leader>w<Right>", "<C-w>l", { desc = "Go to right window" })
+vim.keymap.set("n", "<leader>wh", "<C-w>h", { desc = "Go to left window" })
+vim.keymap.set("n", "<leader>wj", "<C-w>j", { desc = "Go to lower window" })
+vim.keymap.set("n", "<leader>wk", "<C-w>k", { desc = "Go to upper window" })
+vim.keymap.set("n", "<leader>wl", "<C-w>l", { desc = "Go to right window" })
+
+-- Directional splits, mirroring tmux's `prefix s` then a direction. Unlike
+-- LazyVim's <leader>- / <leader>| these can place the new window left or above,
+-- which 'splitright'/'splitbelow' otherwise prevent.
+vim.keymap.set("n", "<leader>wsh", "<cmd>leftabove vsplit<cr>", { desc = "Split left" })
+vim.keymap.set("n", "<leader>wsj", "<cmd>belowright split<cr>", { desc = "Split down" })
+vim.keymap.set("n", "<leader>wsk", "<cmd>aboveleft split<cr>", { desc = "Split up" })
+vim.keymap.set("n", "<leader>wsl", "<cmd>rightbelow vsplit<cr>", { desc = "Split right" })
+vim.keymap.set("n", "<leader>ws<Left>", "<cmd>leftabove vsplit<cr>", { desc = "Split left" })
+vim.keymap.set("n", "<leader>ws<Down>", "<cmd>belowright split<cr>", { desc = "Split down" })
+vim.keymap.set("n", "<leader>ws<Up>", "<cmd>aboveleft split<cr>", { desc = "Split up" })
+vim.keymap.set("n", "<leader>ws<Right>", "<cmd>rightbelow vsplit<cr>", { desc = "Split right" })
 
 -- Move lines up/down
 vim.keymap.set("n", "<A-Up>", "<cmd>m .-2<cr>==", { desc = "Move line up" })
