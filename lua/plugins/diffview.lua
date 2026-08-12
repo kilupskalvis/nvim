@@ -125,6 +125,28 @@ local function describe_unblocked(original)
   return lines
 end
 
+-- Tear down the tabs `gf` opened for this view. Their buffers are then held by
+-- no window, so the sweep can collect them without ever deleting a buffer out
+-- from under something visible. A tab showing unsaved work is left alone -- you
+-- asked for that file, and losing sight of it is worse than an extra tab.
+local function close_session_tabs(session)
+  for _, tab in ipairs(session.tabs) do
+    if vim.api.nvim_tabpage_is_valid(tab) then
+      local dirty = false
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
+        if vim.bo[vim.api.nvim_win_get_buf(win)].modified then
+          dirty = true
+          break
+        end
+      end
+      if not dirty then
+        -- Fails harmlessly on the last remaining tabpage.
+        pcall(vim.cmd, ("tabclose %d"):format(vim.api.nvim_tabpage_get_number(tab)))
+      end
+    end
+  end
+end
+
 -- Hand `bufhidden` back to whoever owned it. Only revert a buffer still sitting
 -- at exactly the value we wrote, so a deliberate change by its owner in the
 -- meantime is not stomped.
@@ -181,8 +203,26 @@ local function close_view()
 end
 
 local function goto_file_in_tab()
+  -- Capture the view before jumping: afterwards the cursor is in the new tab and
+  -- get_current_view() no longer reports the view we came from.
+  local view = require("diffview.lib").get_current_view()
+  local session = view and sessions[view]
+
+  local before = {}
+  for _, t in ipairs(vim.api.nvim_list_tabpages()) do
+    before[t] = true
+  end
+
   require("diffview.actions").goto_file_tab()
   local tab = vim.api.nvim_get_current_tabpage()
+
+  -- Only remember a tab we actually caused. goto_file_tab reuses an existing tab
+  -- when the file is already open in one, and closing that on teardown would
+  -- take a tab the user had before diffview ever ran.
+  if session and not before[tab] then
+    table.insert(session.tabs, tab)
+  end
+
   local group = vim.api.nvim_create_augroup("DiffviewGfTab" .. tab, { clear = true })
   vim.api.nvim_create_autocmd("BufEnter", {
     group = group,
@@ -216,6 +256,7 @@ return {
         sessions[view] = {
           return_to_history = pending_return_to_history,
           unblocked = {},
+          tabs = {},
         }
         pending_return_to_history = false
       end,
@@ -250,6 +291,10 @@ return {
         local orphaned = release_claims(view)
 
         vim.schedule(function()
+          -- Before the sweep, so the files `gf` opened stop being displayed and
+          -- become ordinary collection candidates.
+          close_session_tabs(session)
+
           local kept = {}
           for _, buf in ipairs(orphaned) do
             local name = vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_get_name(buf) or ""
@@ -261,9 +306,9 @@ return {
                 -- discarded without a prompt.
                 table.insert(kept, vim.fn.fnamemodify(name, ":~:."))
               elseif #vim.fn.win_findbuf(buf) == 0 then
-                -- Displayed somewhere means still in use -- a gf tab left open,
-                -- for instance. Deleting it would yank the buffer out from under
-                -- a visible window.
+                -- Still displayed after close_session_tabs means a window we did
+                -- not open is showing it, and deleting it would yank the buffer
+                -- out from under that window.
                 pcall(vim.api.nvim_buf_delete, buf, { force = true })
               end
             end
