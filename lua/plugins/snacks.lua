@@ -104,6 +104,15 @@ return {
                 mode = "i",
                 desc = "End of line",
               },
+              -- Bigger-unit list movement, the picker's version of the tier that
+              -- J/K and S-Arrows occupy in nvim and tmux. The letters are normal
+              -- mode only: the prompt is insert mode, where J and K are literal
+              -- characters, so there is nowhere else to put them. snacks already
+              -- provides j/k, gg and G in this window's normal mode.
+              ["J"] = { "list_scroll_down", mode = "n", desc = "Scroll list down" },
+              ["K"] = { "list_scroll_up", mode = "n", desc = "Scroll list up" },
+              ["<S-Down>"] = { "list_scroll_down", mode = { "i", "n" }, desc = "Scroll list down" },
+              ["<S-Up>"] = { "list_scroll_up", mode = { "i", "n" }, desc = "Scroll list up" },
             },
           },
         },
