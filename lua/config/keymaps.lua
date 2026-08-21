@@ -37,6 +37,12 @@ vim.keymap.set("n", "<leader>d", function() Snacks.bufdelete() end, { desc = "De
 vim.keymap.set("n", "<leader><Left>", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
 vim.keymap.set("n", "<leader><Right>", "<cmd>bnext<cr>", { desc = "Next buffer" })
 
+-- hjkl twins of the arrows above. This takes over LazyVim's <leader>l = :Lazy,
+-- which is still reachable from the dashboard (`L`) and as `:Lazy`, so the only
+-- thing lost is a shortcut to a plugin manager you open rarely.
+vim.keymap.set("n", "<leader>h", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
+vim.keymap.set("n", "<leader>l", "<cmd>bnext<cr>", { desc = "Next buffer" })
+
 -- Line start/end navigation. <M-S-h> normalises to <M-H>, which is a distinct
 -- key from <M-h>, so the hjkl variants can sit alongside the arrows.
 vim.keymap.set({ "n", "v" }, "<M-S-Left>", "^", { desc = "Start of line" })
