@@ -116,16 +116,37 @@ return {
             },
           },
         },
+        -- Ranking. Both are off by default because they cost path normalisation
+        -- per item, which only matters on huge result sets -- and results stop
+        -- being huge once .gitignore is respected below.
+        matcher = {
+          frecency = true, -- files you actually open rank first
+          cwd_bonus = true, -- files under the cwd beat files outside it
+        },
         sources = {
+          -- The two sources are deliberately asymmetric.
+          --
+          -- files keeps `ignored = true` (--no-ignore) so gitignored files like
+          -- .env still appear in the normal file list. A path list is cheap to
+          -- skim even when it includes junk, and there is no way to respect
+          -- .gitignore while re-including one file: fd ignores positive globs
+          -- for ignored paths, and rg treats a positive glob as a whitelist
+          -- that filters out everything else. So the exclude list below stays,
+          -- imperfect as it is.
           files = {
             hidden = true,
             ignored = true,
             exclude = { ".venv", "node_modules", "__pycache__", ".git", "vendor" },
           },
+          -- grep is where --no-ignore actually hurt: thousands of matching
+          -- lines from site-packages and build output, burying the real hits.
+          -- Respecting .gitignore here is what fixed that. .env is excluded on
+          -- top, since grepping secrets is not something to do by accident, and
+          -- .git because `hidden` makes ripgrep descend into it.
           grep = {
             hidden = true,
-            ignored = true,
-            exclude = { ".venv", "node_modules", "__pycache__", ".git", "vendor" },
+            ignored = false,
+            args = { "--glob=!.git", "--glob=!.env*" },
           },
         },
       },
