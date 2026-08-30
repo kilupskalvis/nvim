@@ -70,6 +70,12 @@ vim.keymap.set("i", "<C-BS>", "<C-w>", { desc = "Delete word back" })
 -- Make Ctrl+Z undo
 vim.keymap.set("n", "<C-z>", "u", { noremap = true })
 
+-- Suspend nvim to get the shell it was launched from; `fg` there brings it
+-- back. <C-z> is undo above, so suspend needs its own key. Normal mode only:
+-- insert-mode <C-t> is indent-one-shiftwidth and worth keeping. The only thing
+-- lost is the normal-mode tag-stack pop, which <C-o> covers via the jumplist.
+vim.keymap.set("n", "<C-t>", "<cmd>suspend<cr>", { desc = "Suspend (back to shell)" })
+
 -- Make Ctrl+Y redo
 vim.keymap.set("n", "<C-y>", "<C-r>", { noremap = true })
 
