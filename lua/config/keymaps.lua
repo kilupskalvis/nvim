@@ -80,7 +80,11 @@ vim.keymap.set("n", "<C-t>", "<cmd>suspend<cr>", { desc = "Suspend (back to shel
 vim.keymap.set("n", "<C-y>", "<C-r>", { noremap = true })
 
 vim.api.nvim_create_user_command("Dashboard", function()
-  require("snacks.dashboard").open()
+  -- win = 0 reuses the current window like the startup dashboard does.
+  -- Bare open() makes a fullscreen *float*, and any file later opened from an
+  -- oil float lands back in that dashboard float (oil restores its origin
+  -- window), which looks like the file opening inside the oil float.
+  require("snacks.dashboard").open({ win = 0 })
 end, {})
 
 -- Claude Code
