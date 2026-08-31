@@ -12,39 +12,6 @@ return {
     },
     keymaps = {
       ["q"] = { callback = function() require("oil").close() end, desc = "Close oil" },
-      ["<CR>"] = {
-        callback = function()
-          local oil = require("oil")
-          local entry = oil.get_cursor_entry()
-          if entry and entry.type == "file" then
-            local dir = oil.get_current_dir()
-            local filepath = vim.fn.fnamemodify(dir .. entry.name, ":p")
-            local float_win = vim.api.nvim_get_current_win()
-            -- Find the parent window behind the float
-            local parent_win
-            for _, win in ipairs(vim.api.nvim_list_wins()) do
-              if win ~= float_win and vim.api.nvim_win_get_config(win).relative == "" then
-                parent_win = win
-              end
-            end
-            -- Close the float
-            vim.api.nvim_win_close(float_win, true)
-            -- Open file in parent window
-            if parent_win then
-              vim.api.nvim_set_current_win(parent_win)
-            end
-            local buf = vim.fn.bufnr(filepath)
-            if buf ~= -1 then
-              vim.api.nvim_set_current_buf(buf)
-            else
-              vim.cmd.edit(filepath)
-            end
-          else
-            oil.select()
-          end
-        end,
-        desc = "Open file or enter directory",
-      },
     },
     view_options = {
       show_hidden = true,
@@ -64,6 +31,10 @@ return {
           local dir = require("oil").get_current_dir(args.buf)
           vim.schedule(function()
             vim.cmd.bdelete()
+            -- bdelete leaves a [No Name] buffer in the window; keep it out of
+            -- the buffer list and wipe it once a real file replaces it
+            vim.bo.buflisted = false
+            vim.bo.bufhidden = "wipe"
             require("oil").open_float(dir)
           end)
         end
