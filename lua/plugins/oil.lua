@@ -12,6 +12,10 @@ return {
     },
     keymaps = {
       ["q"] = { callback = function() require("oil").close() end, desc = "Close oil" },
+      -- hjkl navigation: h up a directory, l into entry. Costs normal-mode
+      -- h/l cursor movement inside filenames (use w/b/0/$ when renaming).
+      ["h"] = "actions.parent",
+      ["l"] = "actions.select",
     },
     view_options = {
       show_hidden = true,
