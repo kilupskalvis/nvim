@@ -242,6 +242,7 @@ end
 
 return {
   "sindrets/diffview.nvim",
+  event = "VeryLazy",
   cmd = { "DiffviewOpen", "DiffviewFileHistory" },
   keys = {
     { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "Diffview Open" },
@@ -249,6 +250,23 @@ return {
     { "<leader>gh", "<cmd>DiffviewFileHistory<cr>", desc = "Diffview Git Log" },
   },
   opts = {
+    -- Files above this size are diffed as binary, so `git log --numstat` does
+    -- not line-diff them. The whole-repo file history spent ~50s line-diffing
+    -- multi-hundred-MB JSON dumps in one repo; with this it takes ~8s. Such
+    -- files still open and diff in the view (that goes through `git show` and
+    -- vim's diff mode), they only lose the +N -N counts in the panel.
+    git_cmd = { "git", "-c", "core.bigFileThreshold=5m" },
+    file_history_panel = {
+      log_options = {
+        git = {
+          -- Diffview stops at 256 commits by default and the panel simply ends
+          -- there. Load the whole log; entries stream in, so the panel is
+          -- usable while the rest loads.
+          single_file = { max_count = false },
+          multi_file = { max_count = false },
+        },
+      },
+    },
     watch_index = true,
     hooks = {
       view_opened = function(view)
