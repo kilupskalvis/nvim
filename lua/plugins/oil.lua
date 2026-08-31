@@ -42,6 +42,9 @@ return {
     })
   end,
   keys = {
-    { "<leader>e", function() require("oil").open_float() end, desc = "File Explorer (oil)" },
+    -- toggle_float, not open_float: pressing <leader>e inside the float would
+    -- nest a second float whose "origin window" is the first one, so the next
+    -- selected file opened inside the oil float instead of a normal window
+    { "<leader>e", function() require("oil").toggle_float() end, desc = "File Explorer (oil)" },
   },
 }
