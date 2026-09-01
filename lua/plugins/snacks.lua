@@ -42,6 +42,9 @@ return {
       },
       bigfile = {
         enabled = true,
+        -- Hand-written code stays under ~400KB; above that it's generated
+        -- files, where LSP/treesitter only cause freezes. Default was 1.5MB.
+        size = 500 * 1024,
         ---@param ctx {buf: number, ft: string}
         setup = function(ctx)
           if vim.fn.exists(":NoMatchParen") ~= 0 then
