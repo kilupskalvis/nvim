@@ -269,6 +269,25 @@ return {
     },
     watch_index = true,
     hooks = {
+      -- snacks bigfile only guards real files, so the git-side diffview://
+      -- scratch buffers get full treesitter/diagnostics no matter the size.
+      -- Apply the same 500KB cutoff to every diff buffer.
+      diff_buf_read = function(bufnr)
+        local lines = vim.api.nvim_buf_line_count(bufnr)
+        if vim.api.nvim_buf_get_offset(bufnr, lines) > 500 * 1024 then
+          vim.b[bufnr].diffview_bigfile = true
+          vim.treesitter.stop(bufnr)
+          vim.bo[bufnr].syntax = ""
+          vim.b[bufnr].minidiff_disable = true
+          vim.diagnostic.enable(false, { bufnr = bufnr })
+        end
+      end,
+      diff_buf_win_enter = function(bufnr, winid)
+        if vim.b[bufnr].diffview_bigfile then
+          vim.wo[winid].foldenable = false
+          vim.wo[winid].foldmethod = "manual"
+        end
+      end,
       view_opened = function(view)
         if not view or sessions[view] then return end
         sessions[view] = {
