@@ -17,43 +17,68 @@ local sessions = setmetatable({}, { __mode = "k" })
 -- claimed.
 local pending_return_to_history = false
 
--- Which views a buffer might belong to: buf -> set of views that were open when
--- it was created.
---
--- Ownership used to be inferred by diffing the buffer list at view_opened
--- against the list at view_closed. That cannot describe overlapping views: a
--- buffer opened during view A also predates view B, so B protected it forever
--- and nothing ever collected it, while A's snapshot could equally delete
--- buffers B had been started with. Recording ownership when the buffer appears,
--- and collecting it once every view that could have caused it is gone, is
--- reference counting instead of guesswork and composes with any number of views.
-local owners = {}
-
-local function attribute_buffer(buf)
-  if next(sessions) == nil then return end
-  local set = {}
-  for view in pairs(sessions) do
-    set[view] = true
+-- Diffview wipes its own diffview:// buffers on close (File:destroy), but
+-- deliberately spares working-tree buffers: File:destroy(force) skips
+-- RevType.LOCAL unless forced, and those buffers were created by `:edit` in a
+-- temp window (File:_create_local_buffer). Those, plus the files `gf` opened,
+-- are what lingers after a view. Collect exactly those, from the view's own
+-- file list, instead of claiming every buffer that appeared during the
+-- session -- the old BufNew-based ownership deleted files opened elsewhere
+-- while a view happened to be open.
+local function local_buffers(view, session)
+  local RevType = require("diffview.vcs.rev").RevType
+  local seen, bufs = {}, {}
+  local function add(buf)
+    if buf and not seen[buf] and vim.api.nvim_buf_is_valid(buf) then
+      seen[buf] = true
+      table.insert(bufs, buf)
+    end
   end
-  owners[buf] = set
+  -- A FileEntry is one row of the panel; its layout holds the vcs.File per
+  -- side. Entries may already be destroyed here, so tolerate a dead layout.
+  local function add_entry(entry)
+    local ok, files = pcall(function() return entry.layout:files() end)
+    if not ok or not files then return end
+    for _, file in ipairs(files) do
+      if file.rev and file.rev.type == RevType.LOCAL then add(file.bufnr) end
+    end
+  end
+
+  if view.files and view.files.iter then
+    -- DiffView: every entry, not just the one currently shown.
+    for _, entry in view.files:iter() do add_entry(entry) end
+  elseif view.panel and view.panel.entries then
+    -- FileHistoryView: one log entry per commit, each with its file entries.
+    for _, log_entry in ipairs(view.panel.entries) do
+      for _, entry in ipairs(log_entry.files or {}) do add_entry(entry) end
+    end
+  end
+
+  for _, buf in ipairs(session.gf_bufs) do add(buf) end
+  return bufs
 end
 
--- Release `view`'s claim on every buffer it owned, returning those left with no
--- owner at all.
-local function release_claims(view)
-  local orphaned = {}
-  for buf, set in pairs(owners) do
-    if not vim.api.nvim_buf_is_valid(buf) then
-      owners[buf] = nil
-    elseif set[view] then
-      set[view] = nil
-      if next(set) == nil then
-        owners[buf] = nil
-        table.insert(orphaned, buf)
+-- Another open view has this buffer in its current layout. The closing view is
+-- still registered in lib.views while view_closed runs, hence the exclusion.
+local function used_by_other_view(buf, closing)
+  for _, v in ipairs(require("diffview.lib").views) do
+    if v ~= closing and v.cur_entry and v.cur_entry.layout then
+      for _, file in ipairs(v.cur_entry.layout:files()) do
+        if file.bufnr == buf then return true end
       end
     end
   end
-  return orphaned
+  return false
+end
+
+-- Every buffer that exists, loaded or not: an unloaded buffer still in the
+-- list is one the user had, and diffview reuses it rather than creating one.
+local function existing_buffers()
+  local set = {}
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf) then set[buf] = true end
+  end
+  return set
 end
 
 -- What actually makes diffview's `:tabclose` fail, established by brute-forcing
@@ -221,6 +246,7 @@ local function goto_file_in_tab()
   -- take a tab the user had before diffview ever ran.
   if session and not before[tab] then
     table.insert(session.tabs, tab)
+    table.insert(session.gf_bufs, vim.api.nvim_get_current_buf())
   end
 
   local group = vim.api.nvim_create_augroup("DiffviewGfTab" .. tab, { clear = true })
@@ -294,6 +320,10 @@ return {
           return_to_history = pending_return_to_history,
           unblocked = {},
           tabs = {},
+          gf_bufs = {},
+          -- Files load asynchronously after this hook, so nothing this view
+          -- will create is in the snapshot yet.
+          existing = existing_buffers(),
         }
         pending_return_to_history = false
       end,
@@ -323,9 +353,9 @@ return {
 
         restore_bufhidden(session.unblocked)
 
-        -- Claims are released now, while `view` is still a valid key, but the
-        -- deletions are deferred: diffview is still unwinding its own close.
-        local orphaned = release_claims(view)
+        -- Read the file list now, while the view is intact; delete later,
+        -- because diffview is still unwinding its own close.
+        local candidates = local_buffers(view, session)
 
         vim.schedule(function()
           -- Before the sweep, so the files `gf` opened stop being displayed and
@@ -333,19 +363,12 @@ return {
           close_session_tabs(session)
 
           local kept = {}
-          for _, buf in ipairs(orphaned) do
-            local name = vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_get_name(buf) or ""
-            if name ~= "" then
+          for _, buf in ipairs(candidates) do
+            if vim.api.nvim_buf_is_valid(buf) and not session.existing[buf] then
               if vim.bo[buf].modified then
-                -- Never force-delete unsaved work. This used to clear `modified`
-                -- in view_leave and then wipe the buffer here, so edits to a
-                -- file opened during the session -- via gf, say -- were
-                -- discarded without a prompt.
-                table.insert(kept, vim.fn.fnamemodify(name, ":~:."))
-              elseif #vim.fn.win_findbuf(buf) == 0 then
-                -- Still displayed after close_session_tabs means a window we did
-                -- not open is showing it, and deleting it would yank the buffer
-                -- out from under that window.
+                -- Never force-delete unsaved work.
+                table.insert(kept, vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":~:."))
+              elseif #vim.fn.win_findbuf(buf) == 0 and not used_by_other_view(buf, view) then
                 pcall(vim.api.nvim_buf_delete, buf, { force = true })
               end
             end
@@ -493,14 +516,6 @@ return {
       self.emitter:emit("files_opened")
     end)
 
-    -- Attribution has to happen as buffers appear, so it lives here rather than
-    -- in a hook. Registered on plugin load, which is before any view can open.
-    vim.api.nvim_create_autocmd("BufNew", {
-      callback = function(args) attribute_buffer(args.buf) end,
-    })
-    vim.api.nvim_create_autocmd("BufWipeout", {
-      callback = function(args) owners[args.buf] = nil end,
-    })
 
     vim.api.nvim_create_autocmd("VimLeavePre", {
       callback = function()
