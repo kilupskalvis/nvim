@@ -471,12 +471,15 @@ return {
       if not self:is_files_loaded() then
         self:open_null()
         for _, win in ipairs(self.windows) do
-          if not self:is_valid() then return end
           await(win:load_file())
+          -- load_file can resume in a fast event context (its git job failed
+          -- before create_buffer reached the scheduler). Window API is
+          -- forbidden there, so hop back to the main loop before is_valid.
+          await(async.scheduler())
+          if not self:is_valid() then return end
         end
       end
 
-      if not self:is_valid() then return end
       await(async.scheduler())
 
       if not self:is_valid() then return end
