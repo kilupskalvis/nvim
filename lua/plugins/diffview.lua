@@ -544,14 +544,19 @@ return {
     -- lets input or redraw through (measured: 694 yields, same 3.8s stall). A
     -- timer forces a real loop iteration; defer_fn re-enters via vim.schedule
     -- so the coroutine resumes outside the fast-event context.
-    local yield_frame = async.wrap(function(callback) vim.defer_fn(callback, 1) end, 1)
+    -- 6ms of parsing, 6ms for the editor. Measured in munin-ai with a 5ms
+    -- probe timer: 16/1 gave p90 loop cadence 17ms, 6/6 gives 7ms, and total
+    -- load time is unchanged (git is the bottleneck, parsing keeps up). So
+    -- animations and input stay smooth while the history streams in.
+    local SLICE_NS = 6 * 1e6
+    local PAUSE_MS = 6
+    local yield_frame = async.wrap(function(callback) vim.defer_fn(callback, PAUSE_MS) end, 1)
     local last_yield = 0
-    local YIELD_INTERVAL_NS = 16 * 1e6
 
     FileEntry.with_layout = function(layout_class, opt)
       if opt.commit and coroutine.running() then
         local now = vim.uv.hrtime()
-        if now - last_yield > YIELD_INTERVAL_NS then
+        if now - last_yield > SLICE_NS then
           await(yield_frame())
           last_yield = vim.uv.hrtime()
         end

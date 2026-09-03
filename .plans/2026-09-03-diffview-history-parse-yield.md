@@ -106,3 +106,19 @@ options to restore.
 
 Measured after fix, munin-ai TUI: TabLeave to TabNew 10ms, file buffer read
 within 90ms, layouts built by the switch 0, new tab has diff/scrollbind off.
+
+## Follow-up (2026-09-03): slice fairness
+
+Reported: `gf` and cursor animation felt like a low frame rate. With a 16ms
+work slice and 1ms pause the editor got ~1ms in 17 while the history
+streamed. Measured with a 5ms probe timer during load in munin-ai:
+
+| slice/pause | load | p50 | p90 | p99 | max |
+|---|---|---|---|---|---|
+| 16/1 | 11.0s | 5ms | 17ms | 24ms | 46ms |
+| 8/4 | 10.4s | 8ms | 10ms | 16ms | 50ms |
+| 6/6 | 11.5s | 6ms | 7ms | 14ms | 50ms |
+| 4/8 | 17.9s | 6ms | 8ms | 14ms | 44ms |
+
+Load time is bounded by git, so pausing longer costs nothing until 4/8.
+Chosen: 6/6.
