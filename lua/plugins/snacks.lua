@@ -71,7 +71,9 @@ return {
         end,
       },
       lazygit = { enabled = false },
-      scroll = { enabled = true },
+      -- Animated scrolling queues wheel ticks behind a 200ms animation, so
+      -- the view lags the hand and clicks land on whatever line was passing.
+      scroll = { enabled = false },
       explorer = { enabled = false },
       picker = {
         win = {
