@@ -86,3 +86,23 @@ Opening three entries and closing the view behaved as before. All seven
 cleanup scenarios pass. The remaining stalls are the stdout callback
 (`structure_fh_data`, measured 14ms max) plus panel render, and rare
 larger gaps that were not attributed; all under the 300ms target.
+
+## Follow-up (2026-09-03): tab_leave walked every entry
+
+Reported: `gf` from the whole-repo history took about 2s regardless of file.
+Traced in a real TUI under tmux with an autocmd timeline. Only one TabLeave
+handler exists, diffview's own, which fans out to the view's `tab_leave`
+listener. That listener iterates every file entry of every commit and calls
+`layout:restore_winopts()`: two window checks per entry, 96k entries, the
+original 2s. With deferred layouts it also built all 96k, so leaving the tab
+hung for 40s+ in munin-ai. Headless runs missed it because the panel never
+gained focus before `tabnew` in those scripts.
+
+Fix in config: wrap both listener factory modules
+(`diffview.scene.views.file_history.listeners`, `diffview.scene.views.diff.listeners`)
+and replace `tab_leave` with the same body guarded by `rawget(entry, "layout")`.
+An entry whose layout was never built was never shown, so it has no window
+options to restore.
+
+Measured after fix, munin-ai TUI: TabLeave to TabNew 10ms, file buffer read
+within 90ms, layouts built by the switch 0, new tab has diff/scrollbind off.

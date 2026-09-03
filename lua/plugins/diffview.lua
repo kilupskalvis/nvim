@@ -602,6 +602,42 @@ return {
       return entry
     end
 
+    -- Leaving the tab runs upstream's tab_leave listener, which walks every
+    -- entry of every commit and calls layout:restore_winopts(). Two window
+    -- checks per entry was the original ~2s stall on `gf` from the history;
+    -- with deferred layouts it would also build all of them (40s+ measured).
+    -- An entry whose layout was never built was never shown, so it has no
+    -- window options to restore. Same shape for both view kinds. The listener
+    -- module returns a factory the view calls in init_event_listeners, so
+    -- wrapping the module swaps in the guarded version for every new view.
+    local function guard_tab_leave(modname, entries_of)
+      local factory = require(modname)
+      package.loaded[modname] = function(view)
+        local listeners = factory(view)
+        listeners.tab_leave = function()
+          local cur = view.panel.cur_item and view.panel.cur_item[2] or view.panel.cur_file
+          if cur then cur.layout:detach_files() end
+          for _, entry in entries_of(view) do
+            local layout = rawget(entry, "layout")
+            if layout then layout:restore_winopts() end
+          end
+        end
+        return listeners
+      end
+    end
+
+    guard_tab_leave("diffview.scene.views.file_history.listeners", function(view)
+      -- Flatten log entries -> file entries into one iterator.
+      local entries = {}
+      for _, log_entry in ipairs(view.panel.entries) do
+        for _, entry in ipairs(log_entry.files) do entries[#entries + 1] = entry end
+      end
+      return ipairs(entries)
+    end)
+    guard_tab_leave("diffview.scene.views.diff.listeners", function(view)
+      return view.panel.files:iter()
+    end)
+
     -- Closing a view destroys every entry. An entry whose layout was never
     -- built has nothing to destroy; without this guard teardown would build
     -- all the layouts the deferral skipped.
