@@ -1,0 +1,52 @@
+# Neovim config rewrite: from LazyVim to a hand-written config
+
+## Goal
+
+Own every line. Drop the LazyVim dependency. Learn how a config is built by
+writing it in a pair session: Kalvis types, Claude explains and reviews.
+Target is parity: everything used today keeps working before the switch.
+
+## Decisions
+
+- **Neovim 0.12** built-ins first. A plugin is added only when the built-in is
+  missing or clearly worse.
+- **Plugin manager: `vim.pack`** (built in). `vim.pack.add()` in `init.lua`,
+  lockfile `nvim-pack-lock.json` committed. No lazy-loading framework; where
+  deferred loading matters it is written by hand with autocmds.
+- **LSP: native** `vim.lsp.config` / `vim.lsp.enable` with one `lsp/<server>.lua`
+  per server. Servers installed outside nvim (system package manager, `uv tool`,
+  `npm -g`). nvim-lspconfig's repo is reference material only.
+- **Parallel install** while building: `~/.config/nvim-next`, launched with
+  `NVIM_APPNAME=nvim-next nvim`. Separate data/state/cache. Old config stays
+  untouched until the swap. Moves under `dotfiles/` when it becomes daily driver.
+- **Layout**: modular. `init.lua` requires `config.options`, `config.keymaps`,
+  `config.autocmds`, `config.plugins`; plugins configured in `lua/plugins/*.lua`,
+  one file per plugin or topic, each a plain module (no spec tables to merge).
+- Commits: one line, conventional prefix, no co-author.
+
+## Build order
+
+Each step ends in a usable editor.
+
+1. `init.lua`, options. Parity reference: LazyVim `config/options.lua` plus ours.
+2. Keymaps, autocmds. Port `lua/config/keymaps.lua` and `autocmds.lua`.
+3. `vim.pack` bootstrap and colorscheme (cyberdream).
+4. Treesitter: parsers, highlight, indent.
+5. LSP: `lsp/*.lua` for gopls, basedpyright/pyright, ruff, rust-analyzer, vtsls,
+   yaml, json, marksman, tailwind; `LspAttach` keymaps; diagnostics config.
+6. Completion and snippets.
+7. Picker (files, grep, buffers, symbols, diagnostics).
+8. Git: gitsigns, diffview (file carried over), gitlineage.
+9. Formatting (conform) and linting (nvim-lint).
+10. Editing: flash, yanky, multicursor, mini.ai, mini.pairs, ts-autotag, oil,
+    grug-far, trouble, inc-rename.
+11. UI: statusline, bufferline, noice, dashboard, indent guides, todo, smear.
+
+## Not carried over unless missed
+
+which-key, catppuccin, tokyonight, snacks explorer, snacks scroll, lazygit.
+
+## Verification
+
+Per step: launch `NVIM_APPNAME=nvim-next nvim`, exercise the feature, `:checkhealth`
+where applicable. Before the swap: a day of real use on the new config.
