@@ -530,7 +530,33 @@ return {
     local File = require("diffview.vcs.file").File
     local dv_utils = require("diffview.utils")
 
+    -- parse_fh_data builds every entry of a commit in one synchronous loop on
+    -- the file-history worker coroutine and only yields between commits, so a
+    -- commit with tens of thousands of files still stalls the editor for
+    -- seconds. This is called once per file from that loop; suspending here
+    -- suspends the parse. Yield once per frame. Only on a coroutine (await on
+    -- the main thread busy-waits) and only for history entries, which carry a
+    -- commit: DiffView's working-tree update compares entry lists after
+    -- building them and must not be interleaved.
+    --
+    -- Not vim.schedule: Neovim drains the whole scheduled-event queue before
+    -- returning to the event loop, so a chain of vim.schedule resumptions never
+    -- lets input or redraw through (measured: 694 yields, same 3.8s stall). A
+    -- timer forces a real loop iteration; defer_fn re-enters via vim.schedule
+    -- so the coroutine resumes outside the fast-event context.
+    local yield_frame = async.wrap(function(callback) vim.defer_fn(callback, 1) end, 1)
+    local last_yield = 0
+    local YIELD_INTERVAL_NS = 16 * 1e6
+
     FileEntry.with_layout = function(layout_class, opt)
+      if opt.commit and coroutine.running() then
+        local now = vim.uv.hrtime()
+        if now - last_yield > YIELD_INTERVAL_NS then
+          await(yield_frame())
+          last_yield = vim.uv.hrtime()
+        end
+      end
+
       local entry = FileEntry({
         adapter = opt.adapter,
         path = opt.path,
