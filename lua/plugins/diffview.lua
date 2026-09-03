@@ -517,6 +517,74 @@ return {
     end)
 
 
+    -- File history builds a complete diff layout for every changed file of
+    -- every commit at parse time: four vcs.File objects, two Windows, a Layout
+    -- and an emitter, about 0.46ms per file. The panel only ever reads
+    -- path/status/stats; the layout matters only for an entry that gets
+    -- opened. In a repo with crawl dumps that was 96k layouts, 44s of Lua and
+    -- a 13s freeze on one 28k-file commit. Build the layout on first access
+    -- instead. Every instance has its own metatable (oop.lua new_instance), so
+    -- the hook is per entry and `instanceof`, which reads self.class, is
+    -- unaffected.
+    local FileEntry = require("diffview.scene.file_entry").FileEntry
+    local File = require("diffview.vcs.file").File
+    local dv_utils = require("diffview.utils")
+
+    FileEntry.with_layout = function(layout_class, opt)
+      local entry = FileEntry({
+        adapter = opt.adapter,
+        path = opt.path,
+        oldpath = opt.oldpath,
+        status = opt.status,
+        stats = opt.stats,
+        kind = opt.kind,
+        commit = opt.commit,
+        revs = opt.revs,
+      })
+
+      local mt = getmetatable(entry)
+      mt.__index = function(t, k)
+        if k ~= "layout" then return FileEntry[k] end
+
+        -- Same construction as upstream FileEntry.with_layout, just deferred.
+        local function create_file(rev, symbol)
+          return File({
+            adapter = opt.adapter,
+            path = symbol == "a" and opt.oldpath or opt.path,
+            kind = opt.kind,
+            commit = opt.commit,
+            get_data = opt.get_data,
+            rev = rev,
+            nulled = dv_utils.sate(
+              opt.nulled,
+              select(2, pcall(layout_class.should_null, rev, opt.status, symbol))
+            ),
+          })
+        end
+
+        local layout = layout_class({
+          a = create_file(opt.revs.a, "a"),
+          b = create_file(opt.revs.b, "b"),
+          c = create_file(opt.revs.c, "c"),
+          d = create_file(opt.revs.d, "d"),
+        })
+        rawset(t, "layout", layout)
+        mt.__index = FileEntry
+        return layout
+      end
+
+      return entry
+    end
+
+    -- Closing a view destroys every entry. An entry whose layout was never
+    -- built has nothing to destroy; without this guard teardown would build
+    -- all the layouts the deferral skipped.
+    local fe_destroy = FileEntry.destroy
+    FileEntry.destroy = function(self)
+      if rawget(self, "layout") == nil then return end
+      return fe_destroy(self)
+    end
+
     vim.api.nvim_create_autocmd("VimLeavePre", {
       callback = function()
         if next(sessions) == nil then return end
