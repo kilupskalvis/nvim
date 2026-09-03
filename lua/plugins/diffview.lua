@@ -249,12 +249,22 @@ local function goto_file_in_tab()
     table.insert(session.gf_bufs, vim.api.nvim_get_current_buf())
   end
 
+  -- `q` closes the tab for files shown here. Only for plain file buffers
+  -- that have no `q` of their own: scratch windows opened inside this tab
+  -- (gitlineage, oil, help) bring their own `q`, and overriding it made
+  -- closing the lineage split close the whole tab.
+  local function map_q_close_tab()
+    if vim.bo.buftype ~= "" then return end
+    if vim.fn.maparg("q", "n", false, true).buffer == 1 then return end
+    vim.keymap.set("n", "q", "<cmd>tabclose<cr>", { buffer = true, desc = "Close tab" })
+  end
+
   local group = vim.api.nvim_create_augroup("DiffviewGfTab" .. tab, { clear = true })
   vim.api.nvim_create_autocmd("BufEnter", {
     group = group,
     callback = function()
       if vim.api.nvim_get_current_tabpage() ~= tab then return end
-      vim.keymap.set("n", "q", "<cmd>tabclose<cr>", { buffer = true, desc = "Close tab" })
+      map_q_close_tab()
     end,
   })
   vim.api.nvim_create_autocmd("TabClosed", {
@@ -263,7 +273,7 @@ local function goto_file_in_tab()
       pcall(vim.api.nvim_del_augroup_by_id, group)
     end,
   })
-  vim.keymap.set("n", "q", "<cmd>tabclose<cr>", { buffer = true, desc = "Close tab" })
+  map_q_close_tab()
 end
 
 return {
