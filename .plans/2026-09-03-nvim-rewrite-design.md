@@ -14,8 +14,14 @@ Target is parity: everything used today keeps working before the switch.
   lockfile `nvim-pack-lock.json` committed. No lazy-loading framework; where
   deferred loading matters it is written by hand with autocmds.
 - **LSP: native** `vim.lsp.config` / `vim.lsp.enable` with one `lsp/<server>.lua`
-  per server. Servers installed outside nvim (system package manager, `uv tool`,
-  `npm -g`). nvim-lspconfig's repo is reference material only.
+  per server. nvim-lspconfig's repo is reference material only.
+- **Tools: mason.nvim** installs language servers, formatters, linters and the
+  tree-sitter CLI (decided 2026-09-03, revising the earlier "system packages"
+  choice). Principle: the config must work on any machine right after
+  cloning. Mason is a downloader only: no mason-lspconfig, no auto-wiring;
+  a plain list of package names, missing ones installed on startup. The
+  bootstrap script is reduced to runtimes Mason needs: nvim, git, a C
+  compiler, node, python3, go, ripgrep.
 - **Parallel install** while building: `~/.config/nvim-next`, launched with
   `NVIM_APPNAME=nvim-next nvim`. Separate data/state/cache. Old config stays
   untouched until the swap. Moves under `dotfiles/` when it becomes daily driver.
