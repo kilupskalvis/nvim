@@ -1,3 +1,7 @@
+-- Diffview: side-by-side diffs, merge tool, file history. This module is the
+-- old lazy.nvim spec flattened: helpers, then the options table, then setup,
+-- then the runtime patches and keymaps. Every patch is documented in place.
+
 -- Diffview runs more than one view at a time: a file-history tab alongside a
 -- diff tab, and the close-then-reopen dance behind `gd`. So there is no such
 -- thing as "the" view, and describing one in module-level variables is what
@@ -276,416 +280,408 @@ local function goto_file_in_tab()
   map_q_close_tab()
 end
 
-return {
-  "sindrets/diffview.nvim",
-  event = "VeryLazy",
-  cmd = { "DiffviewOpen", "DiffviewFileHistory" },
-  keys = {
-    { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "Diffview Open" },
-    { "<leader>gf", "<cmd>DiffviewFileHistory %<cr>", desc = "Diffview File History" },
-    { "<leader>gh", "<cmd>DiffviewFileHistory<cr>", desc = "Diffview Git Log" },
+local opts = {
+  -- Files above this size are diffed as binary, so `git log --numstat` does
+  -- not line-diff them. The whole-repo file history spent ~50s line-diffing
+  -- multi-hundred-MB JSON dumps in one repo; with this it takes ~8s. Such
+  -- files still open and diff in the view (that goes through `git show` and
+  -- vim's diff mode), they only lose the +N -N counts in the panel.
+  git_cmd = { "git", "-c", "core.bigFileThreshold=5m" },
+  file_history_panel = {
+    log_options = {
+      git = {
+        -- Diffview stops at 256 commits by default and the panel simply ends
+        -- there. Load the whole log; entries stream in, so the panel is
+        -- usable while the rest loads.
+        single_file = { max_count = false },
+        multi_file = { max_count = false },
+      },
+    },
   },
-  opts = {
-    -- Files above this size are diffed as binary, so `git log --numstat` does
-    -- not line-diff them. The whole-repo file history spent ~50s line-diffing
-    -- multi-hundred-MB JSON dumps in one repo; with this it takes ~8s. Such
-    -- files still open and diff in the view (that goes through `git show` and
-    -- vim's diff mode), they only lose the +N -N counts in the panel.
-    git_cmd = { "git", "-c", "core.bigFileThreshold=5m" },
+  watch_index = true,
+  hooks = {
+    -- snacks bigfile only guards real files, so the git-side diffview://
+    -- scratch buffers get full treesitter/diagnostics no matter the size.
+    -- Apply the same 500KB cutoff to every diff buffer.
+    diff_buf_read = function(bufnr)
+      local lines = vim.api.nvim_buf_line_count(bufnr)
+      if vim.api.nvim_buf_get_offset(bufnr, lines) > 500 * 1024 then
+        vim.b[bufnr].diffview_bigfile = true
+        vim.treesitter.stop(bufnr)
+        vim.bo[bufnr].syntax = ""
+        vim.b[bufnr].minidiff_disable = true
+        vim.diagnostic.enable(false, { bufnr = bufnr })
+      end
+    end,
+    diff_buf_win_enter = function(bufnr, winid)
+      if vim.b[bufnr].diffview_bigfile then
+        vim.wo[winid].foldenable = false
+        vim.wo[winid].foldmethod = "manual"
+      end
+    end,
+    view_opened = function(view)
+      if not view or sessions[view] then return end
+      sessions[view] = {
+        return_to_history = pending_return_to_history,
+        unblocked = {},
+        tabs = {},
+        gf_bufs = {},
+        -- Files load asynchronously after this hook, so nothing this view
+        -- will create is in the snapshot yet.
+        existing = existing_buffers(),
+      }
+      pending_return_to_history = false
+    end,
+    view_leave = function(view)
+      local session = view and sessions[view]
+      if not session then return end
+
+      -- diffview maps `tab_leave` onto `view_leave` (diffview/init.lua:263),
+      -- so this fires every time the tab merely loses focus. View:close()
+      -- sends `closing` before emitting, so it is what separates a real
+      -- teardown from a tab switch. Without this gate the work below ran on
+      -- every tab switch.
+      if not (view.closing and view.closing:check()) then return end
+
+      -- Runs immediately before diffview's :tabclose, so it sees the state the
+      -- close actually fails on.
+      session.leave_blockers = find_blockers()
+
+      -- A modified buffer that cannot be hidden makes the upcoming :tabclose
+      -- fail. Making it hideable lets the tab close with the changes intact.
+      session.unblocked = unblock_tabclose()
+    end,
+    view_closed = function(view)
+      local session = view and sessions[view]
+      if not session then return end
+      sessions[view] = nil
+
+      restore_bufhidden(session.unblocked)
+
+      -- Read the file list now, while the view is intact; delete later,
+      -- because diffview is still unwinding its own close.
+      local candidates = local_buffers(view, session)
+
+      vim.schedule(function()
+        -- Before the sweep, so the files `gf` opened stop being displayed and
+        -- become ordinary collection candidates.
+        close_session_tabs(session)
+
+        local kept = {}
+        for _, buf in ipairs(candidates) do
+          if vim.api.nvim_buf_is_valid(buf) and not session.existing[buf] then
+            if vim.bo[buf].modified then
+              -- Never force-delete unsaved work.
+              table.insert(kept, vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":~:."))
+            elseif #vim.fn.win_findbuf(buf) == 0 and not used_by_other_view(buf, view) then
+              pcall(vim.api.nvim_buf_delete, buf, { force = true })
+            end
+          end
+        end
+
+        if next(kept) then
+          vim.notify("Kept unsaved buffer(s): " .. table.concat(kept, ", "), vim.log.levels.INFO)
+        end
+      end)
+    end,
+  },
+  keymaps = {
+    view = {
+      {
+        "n",
+        "q",
+        close_view,
+        { desc = "Close Diffview" },
+      },
+      { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
+      { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
+    },
+    file_panel = {
+      {
+        "n",
+        "q",
+        close_view,
+        { desc = "Close Diffview" },
+      },
+      {
+        "n",
+        "d",
+        function()
+          local lib = require("diffview.lib")
+          local view = lib.get_current_view()
+          if not view then return end
+
+          local item = view:infer_cur_file(true)
+          if not item then return end
+
+          local is_dir = type(item.collapsed) == "boolean"
+          local prompt = is_dir
+            and ("Discard all changes in %s/?"):format(item.path)
+            or ("Discard changes to %s?"):format(item.path)
+
+          if vim.fn.confirm(prompt, "&Yes\n&No", 2) ~= 1 then return end
+
+          local paths = {}
+          if is_dir then
+            local node = item._node
+            if node then
+              node:deep_some(function(n)
+                if n.data and n.data.path and not n:has_children() then
+                  table.insert(paths, { path = n.data.path, kind = n.data.kind })
+                end
+              end)
+            end
+          else
+            table.insert(paths, { path = item.path, kind = item.kind })
+          end
+
+          local async = require("diffview.async")
+          async.void(function()
+            for _, p in ipairs(paths) do
+              require("diffview.async").await(view.adapter:file_restore(p.path, p.kind, nil))
+            end
+            view:update_files()
+          end)()
+        end,
+        { desc = "Discard file/directory changes" },
+      },
+      { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
+      { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
+    },
     file_history_panel = {
-      log_options = {
-        git = {
-          -- Diffview stops at 256 commits by default and the panel simply ends
-          -- there. Load the whole log; entries stream in, so the panel is
-          -- usable while the rest loads.
-          single_file = { max_count = false },
-          multi_file = { max_count = false },
-        },
-      },
-    },
-    watch_index = true,
-    hooks = {
-      -- snacks bigfile only guards real files, so the git-side diffview://
-      -- scratch buffers get full treesitter/diagnostics no matter the size.
-      -- Apply the same 500KB cutoff to every diff buffer.
-      diff_buf_read = function(bufnr)
-        local lines = vim.api.nvim_buf_line_count(bufnr)
-        if vim.api.nvim_buf_get_offset(bufnr, lines) > 500 * 1024 then
-          vim.b[bufnr].diffview_bigfile = true
-          vim.treesitter.stop(bufnr)
-          vim.bo[bufnr].syntax = ""
-          vim.b[bufnr].minidiff_disable = true
-          vim.diagnostic.enable(false, { bufnr = bufnr })
-        end
-      end,
-      diff_buf_win_enter = function(bufnr, winid)
-        if vim.b[bufnr].diffview_bigfile then
-          vim.wo[winid].foldenable = false
-          vim.wo[winid].foldmethod = "manual"
-        end
-      end,
-      view_opened = function(view)
-        if not view or sessions[view] then return end
-        sessions[view] = {
-          return_to_history = pending_return_to_history,
-          unblocked = {},
-          tabs = {},
-          gf_bufs = {},
-          -- Files load asynchronously after this hook, so nothing this view
-          -- will create is in the snapshot yet.
-          existing = existing_buffers(),
-        }
-        pending_return_to_history = false
-      end,
-      view_leave = function(view)
-        local session = view and sessions[view]
-        if not session then return end
-
-        -- diffview maps `tab_leave` onto `view_leave` (diffview/init.lua:263),
-        -- so this fires every time the tab merely loses focus. View:close()
-        -- sends `closing` before emitting, so it is what separates a real
-        -- teardown from a tab switch. Without this gate the work below ran on
-        -- every tab switch.
-        if not (view.closing and view.closing:check()) then return end
-
-        -- Runs immediately before diffview's :tabclose, so it sees the state the
-        -- close actually fails on.
-        session.leave_blockers = find_blockers()
-
-        -- A modified buffer that cannot be hidden makes the upcoming :tabclose
-        -- fail. Making it hideable lets the tab close with the changes intact.
-        session.unblocked = unblock_tabclose()
-      end,
-      view_closed = function(view)
-        local session = view and sessions[view]
-        if not session then return end
-        sessions[view] = nil
-
-        restore_bufhidden(session.unblocked)
-
-        -- Read the file list now, while the view is intact; delete later,
-        -- because diffview is still unwinding its own close.
-        local candidates = local_buffers(view, session)
-
-        vim.schedule(function()
-          -- Before the sweep, so the files `gf` opened stop being displayed and
-          -- become ordinary collection candidates.
-          close_session_tabs(session)
-
-          local kept = {}
-          for _, buf in ipairs(candidates) do
-            if vim.api.nvim_buf_is_valid(buf) and not session.existing[buf] then
-              if vim.bo[buf].modified then
-                -- Never force-delete unsaved work.
-                table.insert(kept, vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":~:."))
-              elseif #vim.fn.win_findbuf(buf) == 0 and not used_by_other_view(buf, view) then
-                pcall(vim.api.nvim_buf_delete, buf, { force = true })
-              end
-            end
-          end
-
-          if next(kept) then
-            vim.notify("Kept unsaved buffer(s): " .. table.concat(kept, ", "), vim.log.levels.INFO)
-          end
-        end)
-      end,
-    },
-    keymaps = {
-      view = {
-        {
-          "n",
-          "q",
-          close_view,
-          { desc = "Close Diffview" },
-        },
-        { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
-        { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
-      },
-      file_panel = {
-        {
-          "n",
-          "q",
-          close_view,
-          { desc = "Close Diffview" },
-        },
-        {
-          "n",
-          "d",
-          function()
-            local lib = require("diffview.lib")
-            local view = lib.get_current_view()
-            if not view then return end
-
-            local item = view:infer_cur_file(true)
-            if not item then return end
-
-            local is_dir = type(item.collapsed) == "boolean"
-            local prompt = is_dir
-              and ("Discard all changes in %s/?"):format(item.path)
-              or ("Discard changes to %s?"):format(item.path)
-
-            if vim.fn.confirm(prompt, "&Yes\n&No", 2) ~= 1 then return end
-
-            local paths = {}
-            if is_dir then
-              local node = item._node
-              if node then
-                node:deep_some(function(n)
-                  if n.data and n.data.path and not n:has_children() then
-                    table.insert(paths, { path = n.data.path, kind = n.data.kind })
-                  end
-                end)
-              end
-            else
-              table.insert(paths, { path = item.path, kind = item.kind })
-            end
-
-            local async = require("diffview.async")
-            async.void(function()
-              for _, p in ipairs(paths) do
-                require("diffview.async").await(view.adapter:file_restore(p.path, p.kind, nil))
-              end
-              view:update_files()
-            end)()
-          end,
-          { desc = "Discard file/directory changes" },
-        },
-        { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
-        { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
-      },
-      file_history_panel = {
-        { "n", "q", close_view, { desc = "Close Diffview" } },
-        { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
-        { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
-        {
-          "n",
-          "gd",
-          function()
-            local lib = require("diffview.lib")
-            local view = lib.get_current_view()
-            if not view or not view.panel then return end
-            local item = view.panel:get_item_at_cursor()
-            if not item then return end
-            local commit = item.commit or (item.parent and item.parent.commit)
-            if not commit then return end
-            local hash = commit.hash
-            -- Hand the "q returns to the log" intent to the view opened below.
-            -- It cannot live on a view: this one is about to be destroyed and
-            -- its replacement does not exist yet.
-            pending_return_to_history = true
-            vim.cmd("DiffviewClose")
-            vim.schedule(function()
-              vim.cmd("DiffviewOpen " .. hash .. "^.." .. hash)
-            end)
-          end,
-          { desc = "Open commit in Diffview" },
-        },
+      { "n", "q", close_view, { desc = "Close Diffview" } },
+      { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
+      { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
+      {
+        "n",
+        "gd",
+        function()
+          local lib = require("diffview.lib")
+          local view = lib.get_current_view()
+          if not view or not view.panel then return end
+          local item = view.panel:get_item_at_cursor()
+          if not item then return end
+          local commit = item.commit or (item.parent and item.parent.commit)
+          if not commit then return end
+          local hash = commit.hash
+          -- Hand the "q returns to the log" intent to the view opened below.
+          -- It cannot live on a view: this one is about to be destroyed and
+          -- its replacement does not exist yet.
+          pending_return_to_history = true
+          vim.cmd("DiffviewClose")
+          vim.schedule(function()
+            vim.cmd("DiffviewOpen " .. hash .. "^.." .. hash)
+          end)
+        end,
+        { desc = "Open commit in Diffview" },
       },
     },
   },
-  config = function(_, opts)
-    require("diffview").setup(opts)
-
-    local Layout = require("diffview.scene.layout").Layout
-    local async = require("diffview.async")
-    local await = async.await
-
-    Layout.open_files = async.void(function(self)
-      if not self:is_valid() then return end
-
-      if #self:files() < #self.windows then
-        self:open_null()
-        self.emitter:emit("files_opened")
-        return
-      end
-
-      vim.cmd("diffoff!")
-
-      if not self:is_files_loaded() then
-        self:open_null()
-        for _, win in ipairs(self.windows) do
-          await(win:load_file())
-          -- load_file can resume in a fast event context (its git job failed
-          -- before create_buffer reached the scheduler). Window API is
-          -- forbidden there, so hop back to the main loop before is_valid.
-          await(async.scheduler())
-          if not self:is_valid() then return end
-        end
-      end
-
-      await(async.scheduler())
-
-      if not self:is_valid() then return end
-      for _, win in ipairs(self.windows) do
-        if not self:is_valid() then return end
-        await(win:open_file())
-      end
-
-      if not self:is_valid() then return end
-      self:sync_scroll()
-      self.emitter:emit("files_opened")
-    end)
-
-
-    -- File history builds a complete diff layout for every changed file of
-    -- every commit at parse time: four vcs.File objects, two Windows, a Layout
-    -- and an emitter, about 0.46ms per file. The panel only ever reads
-    -- path/status/stats; the layout matters only for an entry that gets
-    -- opened. In a repo with crawl dumps that was 96k layouts, 44s of Lua and
-    -- a 13s freeze on one 28k-file commit. Build the layout on first access
-    -- instead. Every instance has its own metatable (oop.lua new_instance), so
-    -- the hook is per entry and `instanceof`, which reads self.class, is
-    -- unaffected.
-    local FileEntry = require("diffview.scene.file_entry").FileEntry
-    local File = require("diffview.vcs.file").File
-    local dv_utils = require("diffview.utils")
-
-    -- parse_fh_data builds every entry of a commit in one synchronous loop on
-    -- the file-history worker coroutine and only yields between commits, so a
-    -- commit with tens of thousands of files still stalls the editor for
-    -- seconds. This is called once per file from that loop; suspending here
-    -- suspends the parse. Yield once per frame. Only on a coroutine (await on
-    -- the main thread busy-waits) and only for history entries, which carry a
-    -- commit: DiffView's working-tree update compares entry lists after
-    -- building them and must not be interleaved.
-    --
-    -- Not vim.schedule: Neovim drains the whole scheduled-event queue before
-    -- returning to the event loop, so a chain of vim.schedule resumptions never
-    -- lets input or redraw through (measured: 694 yields, same 3.8s stall). A
-    -- timer forces a real loop iteration; defer_fn re-enters via vim.schedule
-    -- so the coroutine resumes outside the fast-event context.
-    -- 6ms of parsing, 6ms for the editor. Measured in munin-ai with a 5ms
-    -- probe timer: 16/1 gave p90 loop cadence 17ms, 6/6 gives 7ms, and total
-    -- load time is unchanged (git is the bottleneck, parsing keeps up). So
-    -- animations and input stay smooth while the history streams in.
-    local SLICE_NS = 6 * 1e6
-    local PAUSE_MS = 6
-    local yield_frame = async.wrap(function(callback) vim.defer_fn(callback, PAUSE_MS) end, 1)
-    local last_yield = 0
-
-    FileEntry.with_layout = function(layout_class, opt)
-      if opt.commit and coroutine.running() then
-        local now = vim.uv.hrtime()
-        if now - last_yield > SLICE_NS then
-          await(yield_frame())
-          last_yield = vim.uv.hrtime()
-        end
-      end
-
-      local entry = FileEntry({
-        adapter = opt.adapter,
-        path = opt.path,
-        oldpath = opt.oldpath,
-        status = opt.status,
-        stats = opt.stats,
-        kind = opt.kind,
-        commit = opt.commit,
-        revs = opt.revs,
-      })
-
-      local mt = getmetatable(entry)
-      mt.__index = function(t, k)
-        if k ~= "layout" then return FileEntry[k] end
-
-        -- Same construction as upstream FileEntry.with_layout, just deferred.
-        local function create_file(rev, symbol)
-          return File({
-            adapter = opt.adapter,
-            path = symbol == "a" and opt.oldpath or opt.path,
-            kind = opt.kind,
-            commit = opt.commit,
-            get_data = opt.get_data,
-            rev = rev,
-            nulled = dv_utils.sate(
-              opt.nulled,
-              select(2, pcall(layout_class.should_null, rev, opt.status, symbol))
-            ),
-          })
-        end
-
-        local layout = layout_class({
-          a = create_file(opt.revs.a, "a"),
-          b = create_file(opt.revs.b, "b"),
-          c = create_file(opt.revs.c, "c"),
-          d = create_file(opt.revs.d, "d"),
-        })
-        rawset(t, "layout", layout)
-        mt.__index = FileEntry
-        return layout
-      end
-
-      return entry
-    end
-
-    -- Leaving the tab runs upstream's tab_leave listener, which walks every
-    -- entry of every commit and calls layout:restore_winopts(). Two window
-    -- checks per entry was the original ~2s stall on `gf` from the history;
-    -- with deferred layouts it would also build all of them (40s+ measured).
-    -- An entry whose layout was never built was never shown, so it has no
-    -- window options to restore. Same shape for both view kinds. The listener
-    -- module returns a factory the view calls in init_event_listeners, so
-    -- wrapping the module swaps in the guarded version for every new view.
-    local function guard_tab_leave(modname, entries_of)
-      local factory = require(modname)
-      package.loaded[modname] = function(view)
-        local listeners = factory(view)
-        listeners.tab_leave = function()
-          local cur = view.panel.cur_item and view.panel.cur_item[2] or view.panel.cur_file
-          if cur then cur.layout:detach_files() end
-          for _, entry in entries_of(view) do
-            local layout = rawget(entry, "layout")
-            if layout then layout:restore_winopts() end
-          end
-        end
-        return listeners
-      end
-    end
-
-    guard_tab_leave("diffview.scene.views.file_history.listeners", function(view)
-      -- Flatten log entries -> file entries into one iterator.
-      local entries = {}
-      for _, log_entry in ipairs(view.panel.entries) do
-        for _, entry in ipairs(log_entry.files) do entries[#entries + 1] = entry end
-      end
-      return ipairs(entries)
-    end)
-    guard_tab_leave("diffview.scene.views.diff.listeners", function(view)
-      return view.panel.files:iter()
-    end)
-
-    -- Closing a view destroys every entry. An entry whose layout was never
-    -- built has nothing to destroy; without this guard teardown would build
-    -- all the layouts the deferral skipped.
-    local fe_destroy = FileEntry.destroy
-    FileEntry.destroy = function(self)
-      if rawget(self, "layout") == nil then return end
-      return fe_destroy(self)
-    end
-
-    vim.api.nvim_create_autocmd("VimLeavePre", {
-      callback = function()
-        if next(sessions) == nil then return end
-        -- Close every open view, not just the current one. `DiffviewClose` only
-        -- ever touches the focused view, so a second view survived into exit.
-        -- Iterate a copy: closing mutates lib.views.
-        local lib = require("diffview.lib")
-        for _, view in ipairs({ unpack(lib.views) }) do
-          pcall(function()
-            view:close()
-            lib.dispose_view(view)
-          end)
-        end
-      end,
-    })
-
-    vim.api.nvim_create_autocmd("BufWritePost", {
-      callback = function()
-        local lib = require("diffview.lib")
-        local view = lib.get_current_view()
-        if view then
-          view:update_files()
-        end
-      end,
-    })
-  end,
 }
+
+require("diffview").setup(opts)
+
+  local Layout = require("diffview.scene.layout").Layout
+  local async = require("diffview.async")
+  local await = async.await
+
+  Layout.open_files = async.void(function(self)
+    if not self:is_valid() then return end
+
+    if #self:files() < #self.windows then
+      self:open_null()
+      self.emitter:emit("files_opened")
+      return
+    end
+
+    vim.cmd("diffoff!")
+
+    if not self:is_files_loaded() then
+      self:open_null()
+      for _, win in ipairs(self.windows) do
+        await(win:load_file())
+        -- load_file can resume in a fast event context (its git job failed
+        -- before create_buffer reached the scheduler). Window API is
+        -- forbidden there, so hop back to the main loop before is_valid.
+        await(async.scheduler())
+        if not self:is_valid() then return end
+      end
+    end
+
+    await(async.scheduler())
+
+    if not self:is_valid() then return end
+    for _, win in ipairs(self.windows) do
+      if not self:is_valid() then return end
+      await(win:open_file())
+    end
+
+    if not self:is_valid() then return end
+    self:sync_scroll()
+    self.emitter:emit("files_opened")
+  end)
+
+
+  -- File history builds a complete diff layout for every changed file of
+  -- every commit at parse time: four vcs.File objects, two Windows, a Layout
+  -- and an emitter, about 0.46ms per file. The panel only ever reads
+  -- path/status/stats; the layout matters only for an entry that gets
+  -- opened. In a repo with crawl dumps that was 96k layouts, 44s of Lua and
+  -- a 13s freeze on one 28k-file commit. Build the layout on first access
+  -- instead. Every instance has its own metatable (oop.lua new_instance), so
+  -- the hook is per entry and `instanceof`, which reads self.class, is
+  -- unaffected.
+  local FileEntry = require("diffview.scene.file_entry").FileEntry
+  local File = require("diffview.vcs.file").File
+  local dv_utils = require("diffview.utils")
+
+  -- parse_fh_data builds every entry of a commit in one synchronous loop on
+  -- the file-history worker coroutine and only yields between commits, so a
+  -- commit with tens of thousands of files still stalls the editor for
+  -- seconds. This is called once per file from that loop; suspending here
+  -- suspends the parse. Yield once per frame. Only on a coroutine (await on
+  -- the main thread busy-waits) and only for history entries, which carry a
+  -- commit: DiffView's working-tree update compares entry lists after
+  -- building them and must not be interleaved.
+  --
+  -- Not vim.schedule: Neovim drains the whole scheduled-event queue before
+  -- returning to the event loop, so a chain of vim.schedule resumptions never
+  -- lets input or redraw through (measured: 694 yields, same 3.8s stall). A
+  -- timer forces a real loop iteration; defer_fn re-enters via vim.schedule
+  -- so the coroutine resumes outside the fast-event context.
+  -- 6ms of parsing, 6ms for the editor. Measured in munin-ai with a 5ms
+  -- probe timer: 16/1 gave p90 loop cadence 17ms, 6/6 gives 7ms, and total
+  -- load time is unchanged (git is the bottleneck, parsing keeps up). So
+  -- animations and input stay smooth while the history streams in.
+  local SLICE_NS = 6 * 1e6
+  local PAUSE_MS = 6
+  local yield_frame = async.wrap(function(callback) vim.defer_fn(callback, PAUSE_MS) end, 1)
+  local last_yield = 0
+
+  FileEntry.with_layout = function(layout_class, opt)
+    if opt.commit and coroutine.running() then
+      local now = vim.uv.hrtime()
+      if now - last_yield > SLICE_NS then
+        await(yield_frame())
+        last_yield = vim.uv.hrtime()
+      end
+    end
+
+    local entry = FileEntry({
+      adapter = opt.adapter,
+      path = opt.path,
+      oldpath = opt.oldpath,
+      status = opt.status,
+      stats = opt.stats,
+      kind = opt.kind,
+      commit = opt.commit,
+      revs = opt.revs,
+    })
+
+    local mt = getmetatable(entry)
+    mt.__index = function(t, k)
+      if k ~= "layout" then return FileEntry[k] end
+
+      -- Same construction as upstream FileEntry.with_layout, just deferred.
+      local function create_file(rev, symbol)
+        return File({
+          adapter = opt.adapter,
+          path = symbol == "a" and opt.oldpath or opt.path,
+          kind = opt.kind,
+          commit = opt.commit,
+          get_data = opt.get_data,
+          rev = rev,
+          nulled = dv_utils.sate(
+            opt.nulled,
+            select(2, pcall(layout_class.should_null, rev, opt.status, symbol))
+          ),
+        })
+      end
+
+      local layout = layout_class({
+        a = create_file(opt.revs.a, "a"),
+        b = create_file(opt.revs.b, "b"),
+        c = create_file(opt.revs.c, "c"),
+        d = create_file(opt.revs.d, "d"),
+      })
+      rawset(t, "layout", layout)
+      mt.__index = FileEntry
+      return layout
+    end
+
+    return entry
+  end
+
+  -- Leaving the tab runs upstream's tab_leave listener, which walks every
+  -- entry of every commit and calls layout:restore_winopts(). Two window
+  -- checks per entry was the original ~2s stall on `gf` from the history;
+  -- with deferred layouts it would also build all of them (40s+ measured).
+  -- An entry whose layout was never built was never shown, so it has no
+  -- window options to restore. Same shape for both view kinds. The listener
+  -- module returns a factory the view calls in init_event_listeners, so
+  -- wrapping the module swaps in the guarded version for every new view.
+  local function guard_tab_leave(modname, entries_of)
+    local factory = require(modname)
+    package.loaded[modname] = function(view)
+      local listeners = factory(view)
+      listeners.tab_leave = function()
+        local cur = view.panel.cur_item and view.panel.cur_item[2] or view.panel.cur_file
+        if cur then cur.layout:detach_files() end
+        for _, entry in entries_of(view) do
+          local layout = rawget(entry, "layout")
+          if layout then layout:restore_winopts() end
+        end
+      end
+      return listeners
+    end
+  end
+
+  guard_tab_leave("diffview.scene.views.file_history.listeners", function(view)
+    -- Flatten log entries -> file entries into one iterator.
+    local entries = {}
+    for _, log_entry in ipairs(view.panel.entries) do
+      for _, entry in ipairs(log_entry.files) do entries[#entries + 1] = entry end
+    end
+    return ipairs(entries)
+  end)
+  guard_tab_leave("diffview.scene.views.diff.listeners", function(view)
+    return view.panel.files:iter()
+  end)
+
+  -- Closing a view destroys every entry. An entry whose layout was never
+  -- built has nothing to destroy; without this guard teardown would build
+  -- all the layouts the deferral skipped.
+  local fe_destroy = FileEntry.destroy
+  FileEntry.destroy = function(self)
+    if rawget(self, "layout") == nil then return end
+    return fe_destroy(self)
+  end
+
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    callback = function()
+      if next(sessions) == nil then return end
+      -- Close every open view, not just the current one. `DiffviewClose` only
+      -- ever touches the focused view, so a second view survived into exit.
+      -- Iterate a copy: closing mutates lib.views.
+      local lib = require("diffview.lib")
+      for _, view in ipairs({ unpack(lib.views) }) do
+        pcall(function()
+          view:close()
+          lib.dispose_view(view)
+        end)
+      end
+    end,
+  })
+
+  vim.api.nvim_create_autocmd("BufWritePost", {
+    callback = function()
+      local lib = require("diffview.lib")
+      local view = lib.get_current_view()
+      if view then
+        view:update_files()
+      end
+    end,
+  })
+vim.keymap.set("n", "<leader>gd", "<cmd>DiffviewOpen<cr>", { desc = "Diffview Open" })
+vim.keymap.set("n", "<leader>gf", "<cmd>DiffviewFileHistory %<cr>", { desc = "Diffview File History" })
+vim.keymap.set("n", "<leader>gh", "<cmd>DiffviewFileHistory<cr>", { desc = "Diffview Git Log" })
