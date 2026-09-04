@@ -99,6 +99,8 @@ require("snacks").setup({
     win = {
       input = {
         keys = {
+          -- <C-c> leaves insert mode like in a buffer; the default closed the picker.
+          ["<C-c>"] = { "<esc>", mode = "i", expr = true, desc = "Normal mode" },
           -- readline-style editing in the prompt
           ["<C-u>"] = { function() vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-u>", true, false, true), "n", false) end, mode = "i", desc = "Kill to start of line" },
           ["<C-k>"] = { function()
