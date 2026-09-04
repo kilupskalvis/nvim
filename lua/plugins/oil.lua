@@ -25,7 +25,15 @@ vim.api.nvim_create_autocmd("VimEnter", {
     -- only with no file arguments, nothing piped in, and an untouched buffer
     if vim.fn.argc() > 0 or vim.bo.buftype ~= "" or vim.api.nvim_buf_get_name(0) ~= "" then return end
     if vim.api.nvim_buf_line_count(0) > 1 or vim.api.nvim_buf_get_lines(0, 0, 1, false)[1] ~= "" then return end
-    require("oil").open(vim.uv.cwd())
+    -- A deleted cwd (shell left in a removed directory) makes uv.cwd() nil and
+    -- every path lookup assert; oil would then show "Loading" forever.
+    local cwd = vim.uv.cwd()
+    if not cwd then
+      cwd = vim.env.HOME
+      vim.cmd.cd(cwd)
+      vim.notify("Working directory no longer exists, using " .. cwd, vim.log.levels.WARN)
+    end
+    require("oil").open(cwd)
   end,
 })
 
