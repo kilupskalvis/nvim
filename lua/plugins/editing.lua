@@ -6,12 +6,21 @@ local map = vim.keymap.set
 -- treesitter node around the cursor, growing with each press.
 require("flash").setup({
   jump = {
-    -- Feed the jump into search history and the search register so `n`
+    -- Feed the `s` jump into search history and the search register so `n`
     -- repeats it. Costs: `s` overwrites the last `/` pattern.
     history = true,
     register = true,
     -- keep hlsearch after the jump so it is visible that `n` has somewhere to go
     nohlsearch = false,
+  },
+  modes = {
+    -- f/t/F/T are enhanced by flash too, and inherit `jump` above unless
+    -- overridden. Without this, every `f<char>` became the search pattern:
+    -- the whole buffer lit up with that letter and `n` jumped to it.
+    -- Char motions repeat with ; and , and must not touch the search register.
+    char = {
+      jump = { register = false, history = false },
+    },
   },
 })
 map({ "n", "x", "o" }, "s", function() require("flash").jump() end, { desc = "Flash" })
