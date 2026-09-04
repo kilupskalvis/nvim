@@ -9,3 +9,4 @@ data
 plugin/
 spell/
 .luarc.json
+.plans/
