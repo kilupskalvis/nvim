@@ -68,10 +68,11 @@ require("snacks").setup({
   },
 
   picker = {
-    -- Open on the list in normal mode, like oil and diffview: j/k move, <CR>
-    -- opens, q or <Esc> closes, i or / to type a filter. Grep sources below
-    -- override this: they show nothing until you type.
-    focus = "list",
+    -- Open with the prompt focused but in normal mode, like oil and diffview:
+    -- j/k move the list, <CR> opens, q or <Esc> closes, i starts typing the
+    -- filter right there. Same for every picker, grep included.
+    focus = "input",
+    on_show = function() vim.cmd.stopinsert() end,
     -- Ranking. Both cost a path normalisation per item, negligible once
     -- .gitignore is respected below.
     matcher = {
@@ -90,14 +91,10 @@ require("snacks").setup({
       -- site-packages and build output. .env excluded so secrets are not
       -- grepped by accident; .git because hidden makes rg descend into it.
       grep = {
-        focus = "input",
         hidden = true,
         ignored = false,
         args = { "--glob=!.git", "--glob=!.env*" },
       },
-      grep_buffers = { focus = "input" },
-      grep_word = { focus = "input" },
-      lines = { focus = "input" },
     },
     win = {
       input = {
@@ -118,7 +115,7 @@ require("snacks").setup({
           ["<S-Up>"] = { "list_scroll_up", mode = { "i", "n" }, desc = "Scroll list up" },
         },
       },
-      -- The list window is where pickers now open; same paging keys there.
+      -- Same paging keys when you do move into the list window.
       list = {
         keys = {
           ["J"] = "list_scroll_down",
