@@ -57,11 +57,11 @@ require("snacks").setup({
       },
     },
     -- The default third section is "startup", which reads lazy.nvim's
-    -- timing stats and errors without lazy.nvim. Recent files instead.
+    -- timing stats and errors without lazy.nvim. Header and keys only.
+    -- (Recent files are one keypress away: r, or <leader>fr.)
     sections = {
       { section = "header" },
       { section = "keys", gap = 1, padding = 1 },
-      { section = "recent_files", icon = " ", title = "Recent Files", indent = 2, padding = 1, limit = 8 },
     },
   },
 
