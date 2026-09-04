@@ -68,6 +68,10 @@ require("snacks").setup({
   },
 
   picker = {
+    -- Open on the list in normal mode, like oil and diffview: j/k move, <CR>
+    -- opens, q or <Esc> closes, i or / to type a filter. Grep sources below
+    -- override this: they show nothing until you type.
+    focus = "list",
     -- Ranking. Both cost a path normalisation per item, negligible once
     -- .gitignore is respected below.
     matcher = {
@@ -86,10 +90,14 @@ require("snacks").setup({
       -- site-packages and build output. .env excluded so secrets are not
       -- grepped by accident; .git because hidden makes rg descend into it.
       grep = {
+        focus = "input",
         hidden = true,
         ignored = false,
         args = { "--glob=!.git", "--glob=!.env*" },
       },
+      grep_buffers = { focus = "input" },
+      grep_word = { focus = "input" },
+      lines = { focus = "input" },
     },
     win = {
       input = {
@@ -108,6 +116,16 @@ require("snacks").setup({
           ["K"] = { "list_scroll_up", mode = "n", desc = "Scroll list up" },
           ["<S-Down>"] = { "list_scroll_down", mode = { "i", "n" }, desc = "Scroll list down" },
           ["<S-Up>"] = { "list_scroll_up", mode = { "i", "n" }, desc = "Scroll list up" },
+        },
+      },
+      -- The list window is where pickers now open; same paging keys there.
+      list = {
+        keys = {
+          ["J"] = "list_scroll_down",
+          ["K"] = "list_scroll_up",
+          ["<S-Down>"] = "list_scroll_down",
+          ["<S-Up>"] = "list_scroll_up",
+          ["l"] = "confirm", -- l opens the entry, as in oil
         },
       },
     },
