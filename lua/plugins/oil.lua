@@ -14,25 +14,18 @@ require("oil").setup({
   view_options = { show_hidden = true },
 })
 
--- When nvim opens a directory (`nvim .`), oil loads as a regular buffer.
--- Redirect it into the float for a consistent UX.
-vim.api.nvim_create_autocmd("BufWinEnter", {
-  group = vim.api.nvim_create_augroup("config_oil_float", { clear = true }),
-  pattern = "oil://*",
-  callback = function(args)
-    local win = vim.api.nvim_get_current_win()
-    if vim.api.nvim_win_get_config(win).relative ~= "" then return end
-    -- Capture the dir before bdelete; afterwards the current buffer is
-    -- unnamed and open_float() would fall back to the cwd.
-    local dir = require("oil").get_current_dir(args.buf)
-    vim.schedule(function()
-      vim.cmd.bdelete()
-      -- bdelete leaves a [No Name] buffer; keep it unlisted and wipe it
-      -- once a real file replaces it.
-      vim.bo.buflisted = false
-      vim.bo.bufhidden = "wipe"
-      require("oil").open_float(dir)
-    end)
+-- Start screen: bare `nvim` shows the directory you launched in, as a plain
+-- oil window. `nvim .` and `:e somedir` land in the same place, so there is
+-- one behavior for "I opened nvim without a file". <leader>e keeps the float
+-- for browsing while editing.
+vim.api.nvim_create_autocmd("VimEnter", {
+  group = vim.api.nvim_create_augroup("config_oil_start", { clear = true }),
+  nested = true,
+  callback = function()
+    -- only with no file arguments, nothing piped in, and an untouched buffer
+    if vim.fn.argc() > 0 or vim.bo.buftype ~= "" or vim.api.nvim_buf_get_name(0) ~= "" then return end
+    if vim.api.nvim_buf_line_count(0) > 1 or vim.api.nvim_buf_get_lines(0, 0, 1, false)[1] ~= "" then return end
+    require("oil").open(vim.uv.cwd())
   end,
 })
 

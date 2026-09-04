@@ -2,7 +2,7 @@
 -- do anything. Enabled now: picker (fuzzy finder for everything), bigfile,
 -- quickfile, input (nicer vim.ui.input, used by rename), notifier
 -- (vim.notify as popups), terminal (Claude toggle), git (blame line).
--- Left off until the UI step: dashboard, indent, scope, words, statuscolumn.
+-- Also enabled in the UI step: indent, scope, words. Dashboard off: bare `nvim` opens oil.
 -- Left off for good: scroll (animated scrolling), explorer (oil instead).
 require("snacks").setup({
   bigfile = {
@@ -35,35 +35,8 @@ require("snacks").setup({
   indent = { enabled = true },  -- indent guides, current scope highlighted
   scope = { enabled = true },   -- ii / ai text objects and ]i [i jumps on scope
   words = { enabled = true },   -- highlight other references of the word under cursor (LSP)
-  dashboard = {
-    enabled = true,
-    preset = {
-      header = [[
-███╗   ██╗███████╗ ██████╗ ██╗   ██╗██╗███╗   ███╗
-████╗  ██║██╔════╝██╔═══██╗██║   ██║██║████╗ ████║
-██╔██╗ ██║█████╗  ██║   ██║██║   ██║██║██╔████╔██║
-██║╚██╗██║██╔══╝  ██║   ██║╚██╗ ██╔╝██║██║╚██╔╝██║
-██║ ╚████║███████╗╚██████╔╝ ╚████╔╝ ██║██║ ╚═╝ ██║
-╚═╝  ╚═══╝╚══════╝ ╚═════╝   ╚═══╝  ╚═╝╚═╝     ╚═╝]],
-      -- No `g` entry: with bare-letter shortcuts, <leader>g timing out on the
-      -- dashboard ran "Find Text" instead of reaching <leader>gd / <leader>gh.
-      keys = {
-        { icon = " ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
-        { icon = " ", key = "n", desc = "New File", action = ":ene | startinsert" },
-        { icon = " ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
-        { icon = " ", key = "c", desc = "Config", action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})" },
-        { icon = "󰏗 ", key = "m", desc = "Mason", action = ":Mason" },
-        { icon = " ", key = "q", desc = "Quit", action = ":qa" },
-      },
-    },
-    -- The default third section is "startup", which reads lazy.nvim's
-    -- timing stats and errors without lazy.nvim. Header and keys only.
-    -- (Recent files are one keypress away: r, or <leader>fr.)
-    sections = {
-      { section = "header" },
-      { section = "keys", gap = 1, padding = 1 },
-    },
-  },
+  -- No start screen. Bare `nvim` opens oil on the cwd instead (plugins/oil.lua).
+  dashboard = { enabled = false },
 
   picker = {
     -- Ranking. Both cost a path normalisation per item, negligible once
@@ -163,13 +136,6 @@ map("n", "<leader>su", function() p.undo() end, { desc = "Undo tree" })
 map("n", "<leader>sR", function() p.resume() end, { desc = "Resume last picker" })
 map("n", "<leader>uC", function() p.colorschemes() end, { desc = "Colorschemes" })
 map("n", "<leader>n", function() p.notifications() end, { desc = "Notification history" })
-
--- :Dashboard reopens the start screen in the current window. Bare open()
--- makes a fullscreen float, and files opened later from an oil float landed
--- back inside that float.
-vim.api.nvim_create_user_command("Dashboard", function()
-  Snacks.dashboard.open({ win = 0 })
-end, {})
 
 -- Terminal and git helpers ----------------------------------------------
 map("n", "<leader>cc", function() Snacks.terminal("claude") end, { desc = "Claude Code (toggle)" })
