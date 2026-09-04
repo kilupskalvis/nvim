@@ -14,10 +14,8 @@ require("oil").setup({
   view_options = { show_hidden = true },
 })
 
--- Start screen: bare `nvim` shows the directory you launched in, as a plain
--- oil window. `nvim .` and `:e somedir` land in the same place, so there is
--- one behavior for "I opened nvim without a file". <leader>e keeps the float
--- for browsing while editing.
+-- Start screen: bare `nvim` opens the oil float on the cwd. The empty buffer
+-- stays behind it, so a file picked in the float opens in a normal window.
 vim.api.nvim_create_autocmd("VimEnter", {
   group = vim.api.nvim_create_augroup("config_oil_start", { clear = true }),
   nested = true,
@@ -33,7 +31,29 @@ vim.api.nvim_create_autocmd("VimEnter", {
       vim.cmd.cd(cwd)
       vim.notify("Working directory no longer exists, using " .. cwd, vim.log.levels.WARN)
     end
-    require("oil").open(cwd)
+    require("oil").open_float(cwd)
+  end,
+})
+
+-- `nvim .` and `:e somedir` open oil as a regular buffer. Redirect into the
+-- float so every way of landing in oil looks the same.
+vim.api.nvim_create_autocmd("BufWinEnter", {
+  group = vim.api.nvim_create_augroup("config_oil_float", { clear = true }),
+  pattern = "oil://*",
+  callback = function(args)
+    local win = vim.api.nvim_get_current_win()
+    if vim.api.nvim_win_get_config(win).relative ~= "" then return end
+    -- Capture the dir before bdelete; afterwards the current buffer is
+    -- unnamed and open_float() would fall back to the cwd.
+    local dir = require("oil").get_current_dir(args.buf)
+    vim.schedule(function()
+      vim.cmd.bdelete()
+      -- bdelete leaves a [No Name] buffer; keep it unlisted and wipe it
+      -- once a real file replaces it.
+      vim.bo.buflisted = false
+      vim.bo.bufhidden = "wipe"
+      require("oil").open_float(dir)
+    end)
   end,
 })
 

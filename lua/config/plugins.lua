@@ -35,7 +35,8 @@ vim.pack.add({
   { src = "https://github.com/folke/trouble.nvim" },
   { src = "https://github.com/smjonas/inc-rename.nvim" },
   { src = "https://github.com/stevearc/oil.nvim" },
-  { src = "https://github.com/nvim-tree/nvim-web-devicons" }, -- icons for oil and trouble
+  { src = "https://github.com/nvim-tree/nvim-web-devicons" }, -- some plugins require it by name
+  { src = "https://github.com/nvim-mini/mini.icons" },         -- the icons actually shown; mocks devicons
   -- ui
   { src = "https://github.com/nvim-lualine/lualine.nvim" },
   { src = "https://github.com/akinsho/bufferline.nvim" },
@@ -48,6 +49,7 @@ vim.pack.add({
 
 -- Per-plugin configuration. Each module calls the plugin's setup().
 require("plugins.colorscheme")
+require("plugins.icons") -- before anything that draws icons
 require("plugins.mason") -- before treesitter: it needs tree-sitter-cli on PATH
 require("plugins.treesitter")
 require("plugins.completion") -- before lsp: sets client capabilities for every server
