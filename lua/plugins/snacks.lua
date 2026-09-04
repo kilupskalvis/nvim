@@ -45,16 +45,18 @@ require("snacks").setup({
 ██║╚██╗██║██╔══╝  ██║   ██║╚██╗ ██╔╝██║██║╚██╔╝██║
 ██║ ╚████║███████╗╚██████╔╝ ╚████╔╝ ██║██║ ╚═╝ ██║
 ╚═╝  ╚═══╝╚══════╝ ╚═════╝   ╚═══╝  ╚═╝╚═╝     ╚═╝]],
+      -- Icons as \u escapes: pasted glyphs once came through as U+0000 and
+      -- rendered as blanks. Codepoints match LazyVim's dashboard (Nerd Font v3).
       -- No `g` entry: with bare-letter shortcuts, <leader>g timing out on the
       -- dashboard ran "Find Text" instead of reaching <leader>gd / <leader>gh.
       keys = {
-        { icon = " ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
-        { icon = " ", key = "n", desc = "New File", action = ":ene | startinsert" },
-        { icon = " ", key = "e", desc = "Explorer", action = ":lua require('oil').open_float()" },
-        { icon = " ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
-        { icon = " ", key = "c", desc = "Config", action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})" },
-        { icon = "󰏗 ", key = "m", desc = "Mason", action = ":Mason" },
-        { icon = " ", key = "q", desc = "Quit", action = ":qa" },
+        { icon = "\u{F002} ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
+        { icon = "\u{F15B} ", key = "n", desc = "New File", action = ":ene | startinsert" },
+        { icon = "\u{F024B} ", key = "e", desc = "Explorer", action = ":lua require('oil').open_float()" },
+        { icon = "\u{F0C5} ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
+        { icon = "\u{F423} ", key = "c", desc = "Config", action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})" },
+        { icon = "\u{F03D7} ", key = "m", desc = "Mason", action = ":Mason" },
+        { icon = "\u{F426} ", key = "q", desc = "Quit", action = ":qa" },
       },
     },
     -- The default third section is "startup", which reads lazy.nvim's

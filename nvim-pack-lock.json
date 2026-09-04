@@ -61,6 +61,10 @@
       "rev": "7c840c71d6a91f53d734cab2b6fe2290d285ec3b",
       "src": "https://github.com/nvim-mini/mini.hipatterns"
     },
+    "mini.icons": {
+      "rev": "98faae31e9be1cc054ae63485e58ceb185efcad0",
+      "src": "https://github.com/nvim-mini/mini.icons"
+    },
     "mini.pairs": {
       "rev": "b1c5a726921b7a8c9321e9a7a208aa0571de5810",
       "src": "https://github.com/nvim-mini/mini.pairs"
