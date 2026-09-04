@@ -50,7 +50,16 @@ Each step ends in a usable editor.
 
 ## Not carried over unless missed
 
-which-key, catppuccin, tokyonight, snacks explorer, snacks scroll, lazygit.
+which-key, catppuccin, tokyonight, snacks explorer, snacks scroll, lazygit,
+grug-far (never used), render-markdown (not wanted), mini.diff (gitsigns
+instead), illuminate and mini.indentscope (snacks words/indent instead).
+
+## Progress (2026-09-04)
+
+Steps 1-11 written in `~/.config/nvim-next` and verified headless. 31 plugins
+under `vim.pack`, 31 Mason packages, 20 `lsp/*.lua`. Remaining: daily use,
+then the swap (delete `~/.local/share/nvim` and `~/.local/state/nvim`, rename
+`nvim-next` to `nvim`, move under `dotfiles/`).
 
 ## Verification
 
