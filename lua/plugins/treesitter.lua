@@ -12,6 +12,7 @@ local parsers = {
   "lua", "vim", "vimdoc", "query", "c", "markdown", "markdown_inline",
   -- languages from the old LazyVim extras
   "go", "gomod", "gosum", "gowork",
+  "cpp", -- c is bundled with Neovim
   "python",
   "rust",
   "typescript", "tsx", "javascript", "jsdoc",
