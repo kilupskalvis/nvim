@@ -64,6 +64,17 @@ vim.api.nvim_create_autocmd("LspAttach", {
     -- expr mapping: returns the command line to run, cursor word prefilled.
     if package.loaded["inc_rename"] then
       vim.keymap.set("n", "<leader>cr", function()
+        -- IncRename redraws the buffer on every keystroke (inccommand
+        -- preview); smear-cursor's animation toward the cmdline loses its
+        -- target mid-jump and the trail sticks. Pause it for this cmdline.
+        local smear = package.loaded["smear_cursor"]
+        if smear and smear.enabled then
+          smear.enabled = false
+          vim.api.nvim_create_autocmd("CmdlineLeave", {
+            once = true,
+            callback = function() vim.schedule(function() smear.enabled = true end) end,
+          })
+        end
         return ":IncRename " .. vim.fn.expand("<cword>")
       end, { buffer = buf, expr = true, desc = "Rename (preview)" })
     else
