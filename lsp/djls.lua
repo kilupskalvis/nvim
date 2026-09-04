@@ -1,7 +1,10 @@
 -- Django language server: the Python side (models, urls, settings).
--- Only useful inside a Django project, so manage.py is the first marker.
+-- Only inside a Django project: the sole root marker is manage.py, and
+-- workspace_required means no root, no server, so plain Python projects
+-- never see it.
 return {
   cmd = { "djls", "serve" },
   filetypes = { "htmldjango", "html", "python" },
-  root_markers = { "manage.py", "pyproject.toml", ".git" },
+  root_markers = { "manage.py" },
+  workspace_required = true,
 }
