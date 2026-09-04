@@ -60,8 +60,11 @@ Steps 1-11 written in `~/.config/nvim-next` and verified headless. 31 plugins
 under `vim.pack`, 31 Mason packages, 20 `lsp/*.lua`. Swapped on 2026-09-04: `rewrite`
 fast-forwarded into `main`, worktree and `nvim-next` symlink removed, the
 `nvim-next` data dir moved to `~/.local/share/nvim` (old one kept as
-`~/.local/share/nvim.old`). Mason's pip venvs hardcode absolute paths, so the
-five pip packages were reinstalled after the move. State dir kept, so shada,
+`~/.local/share/nvim.old`). Moving the data dir was a mistake: absolute paths
+hide in Mason's pip venvs, Mason's lua-language-server wrapper, and
+nvim-treesitter's `site/queries/<lang>` symlinks; four parsers had also been
+left half-installed by aborted headless runs. All repaired, but next time
+reinstall into the final location instead of moving. State dir kept, so shada,
 undo history and old files carried over.
 
 ## Verification
