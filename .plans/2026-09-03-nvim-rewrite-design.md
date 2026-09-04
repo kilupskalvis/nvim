@@ -57,9 +57,12 @@ instead), illuminate and mini.indentscope (snacks words/indent instead).
 ## Progress (2026-09-04)
 
 Steps 1-11 written in `~/.config/nvim-next` and verified headless. 31 plugins
-under `vim.pack`, 31 Mason packages, 20 `lsp/*.lua`. Remaining: daily use,
-then the swap (delete `~/.local/share/nvim` and `~/.local/state/nvim`, rename
-`nvim-next` to `nvim`, move under `dotfiles/`).
+under `vim.pack`, 31 Mason packages, 20 `lsp/*.lua`. Swapped on 2026-09-04: `rewrite`
+fast-forwarded into `main`, worktree and `nvim-next` symlink removed, the
+`nvim-next` data dir moved to `~/.local/share/nvim` (old one kept as
+`~/.local/share/nvim.old`). Mason's pip venvs hardcode absolute paths, so the
+five pip packages were reinstalled after the move. State dir kept, so shada,
+undo history and old files carried over.
 
 ## Verification
 
