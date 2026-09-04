@@ -19,6 +19,8 @@ local autocmd = vim.api.nvim_create_autocmd
 autocmd({ "FocusGained", "TermClose", "TermLeave", "CursorHold", "CursorHoldI", "BufEnter" }, {
   group = augroup("checktime"),
   callback = function()
+    -- The command-line window (q: / q/) forbids most commands: E11 on checktime.
+    if vim.fn.getcmdwintype() ~= "" then return end
     if vim.o.buftype ~= "nofile" then vim.cmd("checktime") end
   end,
 })
