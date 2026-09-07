@@ -33,8 +33,9 @@ run.
 Runtimes the tools build on, installed by the dotfiles setup:
 
     neovim >= 0.12, git, a C compiler, node, go, ripgrep
-    uv, then `uv python install 3.12 --default` (Mason's pip packages need a
-    python with ensurepip; Ubuntu's system python ships without it)
+    python3 on PATH whose venvs get pip (Mason installs basedpyright, djlint,
+    clang-format and the Django servers into venvs); any location, any
+    manager. Check: python3 -m venv /tmp/t && /tmp/t/bin/python -m pip --version
     rustup (only for Rust projects)
 
 Dependencies, the Nerd Font, and the shell / tmux / Ghostty configuration this
