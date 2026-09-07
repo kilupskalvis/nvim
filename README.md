@@ -33,7 +33,7 @@ run.
 Runtimes the tools build on, installed by the dotfiles setup:
 
     neovim >= 0.12, git, a C compiler, node, go, ripgrep
-    python3 on PATH whose venvs get pip (Mason installs basedpyright, djlint,
+    python3 on PATH whose venvs get pip (Mason installs djlint,
     clang-format and the Django servers into venvs); any location, any
     manager. Check: python3 -m venv /tmp/t && /tmp/t/bin/python -m pip --version
     rustup (only for Rust projects)

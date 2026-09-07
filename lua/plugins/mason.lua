@@ -20,7 +20,7 @@ local tools = {
   -- language servers
   "lua-language-server",
   "gopls",
-  "basedpyright",
+  "pyright",
   "ruff",
   "django-language-server", -- Django Python side: models, urls, settings
   "django-template-lsp",    -- Django templates: tags, filters, template paths

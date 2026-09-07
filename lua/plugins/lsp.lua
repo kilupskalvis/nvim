@@ -6,7 +6,7 @@
 -- Servers -----------------------------------------------------------------
 
 local servers = {
-  "lua_ls", "gopls", "basedpyright", "ruff", "djls", "djlsp", "rust_analyzer",
+  "lua_ls", "gopls", "pyright", "ruff", "djls", "djlsp", "rust_analyzer",
   "vtsls", "eslint", "jsonls", "yamlls", "html", "cssls", "tailwindcss",
   "bashls", "dockerls", "docker_compose_language_service", "marksman", "taplo", "clangd",
 }
@@ -103,7 +103,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
       map("<leader>cc", vim.lsp.codelens.run, "Run code lens")
     end
 
-    -- ruff and basedpyright both attach to Python. basedpyright owns hover;
+    -- ruff and pyright both attach to Python. pyright owns hover;
     -- otherwise you get two hover windows.
     if client.name == "ruff" then
       client.server_capabilities.hoverProvider = false
