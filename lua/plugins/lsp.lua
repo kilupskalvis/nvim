@@ -55,11 +55,15 @@ vim.api.nvim_create_autocmd("LspAttach", {
       vim.keymap.set(mode or "n", lhs, rhs, { buffer = buf, desc = desc })
     end
 
-    map("gd", vim.lsp.buf.definition, "Go to definition")
-    map("gD", vim.lsp.buf.declaration, "Go to declaration")
-    map("gI", vim.lsp.buf.implementation, "Go to implementation")
-    map("gy", vim.lsp.buf.type_definition, "Go to type definition")
-    map("gr", vim.lsp.buf.references, "References")
+    -- Navigation goes through the snacks picker: one result jumps straight
+    -- there, several show as a list with preview. The raw vim.lsp.buf
+    -- versions fill the quickfix list at the bottom instead.
+    local pick = package.loaded["snacks"] and Snacks.picker
+    map("gd", pick and pick.lsp_definitions or vim.lsp.buf.definition, "Go to definition")
+    map("gD", pick and pick.lsp_declarations or vim.lsp.buf.declaration, "Go to declaration")
+    map("gI", pick and pick.lsp_implementations or vim.lsp.buf.implementation, "Go to implementation")
+    map("gy", pick and pick.lsp_type_definitions or vim.lsp.buf.type_definition, "Go to type definition")
+    map("gr", pick and function() pick.lsp_references() end or vim.lsp.buf.references, "References", { "n" })
     -- inc-rename previews every occurrence while you type the new name.
     -- expr mapping: returns the command line to run, cursor word prefilled.
     if package.loaded["inc_rename"] then
