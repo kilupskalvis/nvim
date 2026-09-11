@@ -36,6 +36,8 @@ require("gitsigns").setup({
     map("n", "[H", function() gs.nav_hunk("first") end, "First hunk")
     map({ "n", "x" }, "<leader>gks", ":Gitsigns stage_hunk<CR>", "Stage hunk")
     map({ "n", "x" }, "<leader>gkr", ":Gitsigns reset_hunk<CR>", "Reset hunk")
+    -- Undo lives on <C-z>, so `u` is free for the frequent hunk reset.
+    map("n", "u", ":Gitsigns reset_hunk<CR>", "Reset hunk")
     map("n", "<leader>gkS", gs.stage_buffer, "Stage buffer")
     map("n", "<leader>gku", gs.undo_stage_hunk, "Undo stage hunk")
     map("n", "<leader>gkR", gs.reset_buffer, "Reset buffer")
