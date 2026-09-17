@@ -231,6 +231,23 @@ local function close_view()
   end
 end
 
+local function toggle_files()
+  local lib = require("diffview.lib")
+  local view = lib.get_current_view()
+  if not view or not view.panel then return end
+  local panel = view.panel
+  if panel:is_open() and panel.winid and vim.api.nvim_win_is_valid(panel.winid) then
+    vim.b[panel.bufid].diffview_saved_cursor = vim.api.nvim_win_get_cursor(panel.winid)
+  end
+  panel:toggle(true)
+  if panel:is_open() and panel.winid and vim.api.nvim_win_is_valid(panel.winid) then
+    local saved = panel.bufid and vim.b[panel.bufid].diffview_saved_cursor
+    if saved then
+      pcall(vim.api.nvim_win_set_cursor, panel.winid, saved)
+    end
+  end
+end
+
 local function goto_file_in_tab()
   -- Capture the view before jumping: afterwards the cursor is in the new tab and
   -- get_current_view() no longer reports the view we came from.
@@ -394,7 +411,7 @@ local opts = {
         { desc = "Close Diffview" },
       },
       { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
-      { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
+      { "n", "<leader>e", toggle_files, { desc = "Toggle file panel" } },
     },
     file_panel = {
       {
@@ -446,12 +463,12 @@ local opts = {
         { desc = "Discard file/directory changes" },
       },
       { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
-      { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
+      { "n", "<leader>e", toggle_files, { desc = "Toggle file panel" } },
     },
     file_history_panel = {
       { "n", "q", close_view, { desc = "Close Diffview" } },
       { "n", "gf", goto_file_in_tab, { desc = "Open file in new tab" } },
-      { "n", "<leader>e", "<cmd>DiffviewToggleFiles<cr>", { desc = "Toggle file panel" } },
+      { "n", "<leader>e", toggle_files, { desc = "Toggle file panel" } },
       {
         "n",
         "gd",
