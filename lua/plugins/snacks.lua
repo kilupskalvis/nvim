@@ -32,7 +32,12 @@ require("snacks").setup({
   terminal = { win = { position = "bottom" } },
   scroll = { enabled = false },
   explorer = { enabled = false },
-  indent = { enabled = true },  -- indent guides, current scope highlighted
+  -- Indent guides, current scope highlighted. The scope bar animates on every
+  -- scope change; the default 500ms at 20ms a step is up to 25 redraws each time.
+  indent = {
+    enabled = true,
+    animate = { duration = { step = 40, total = 150 } },
+  },
   scope = { enabled = true },   -- ii / ai text objects and ]i [i jumps on scope
   words = { enabled = true },   -- highlight other references of the word under cursor (LSP)
   dashboard = {

@@ -164,10 +164,13 @@ require("smear_cursor").setup({
   -- hide_target_hack without never_draw_over_target made the cell under the
   -- cursor flicker; the plugin's own docs warn against the combination.
   hide_target_hack = false,
-  -- Fast head, lagging tail: snappy cursor, long trail.
+  -- Insert mode fired the animation once per keystroke. No trail while typing.
+  smear_insert_mode = false,
+  -- Fast head, trailing tail. Each frame is a full redraw, so 17ms (~60fps) and
+  -- a tail that converges early keep the count down; it shows over SSH.
   stiffness = 0.8,
-  trailing_stiffness = 0.35,
+  trailing_stiffness = 0.6,
   damping = 0.9,
-  distance_stop_animating = 0.3,
-  time_interval = 7,
+  distance_stop_animating = 0.5,
+  time_interval = 17,
 })
