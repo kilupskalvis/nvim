@@ -3,6 +3,7 @@
 require("oil").setup({
   default_file_explorer = true, -- opening a directory opens oil instead of netrw
   delete_to_trash = true,
+  watch_for_changes = true,
   float = { padding = 2, max_width = 0.8, max_height = 0.8 },
   keymaps = {
     ["q"] = { callback = function() require("oil").close() end, desc = "Close oil" },

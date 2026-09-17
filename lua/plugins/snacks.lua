@@ -145,9 +145,21 @@ local p = Snacks.picker
 -- Files and grep default to the git root when inside a repo, else cwd.
 local function root() return Snacks.git.get_root() or vim.uv.cwd() end
 
+-- Buffer-local directory: oil's browsed dir, otherwise the buffer's parent.
+local function bufdir()
+  local oil_ok, oil = pcall(require, "oil")
+  if oil_ok then
+    local dir = oil.get_current_dir()
+    if dir then return dir end
+  end
+  local name = vim.api.nvim_buf_get_name(0)
+  if name ~= "" then return vim.fn.fnamemodify(name, ":p:h") end
+  return vim.uv.cwd()
+end
+
 map("n", "<leader><space>", function() p.files({ cwd = root() }) end, { desc = "Find files (root)" })
-map("n", "<leader>ff", function() p.files({ cwd = root() }) end, { desc = "Find files (root)" })
-map("n", "<leader>fF", function() p.files() end, { desc = "Find files (cwd)" })
+map("n", "<leader>ff", function() p.files({ cwd = bufdir() }) end, { desc = "Find files (cwd)" })
+map("n", "<leader>fF", function() p.files({ cwd = root() }) end, { desc = "Find files (root)" })
 map("n", "<leader>fg", function() p.git_files() end, { desc = "Find files (git)" })
 map("n", "<leader>fr", function() p.recent() end, { desc = "Recent files" })
 map("n", "<leader>fR", function() p.recent({ filter = { cwd = true } }) end, { desc = "Recent files (cwd)" })
@@ -157,8 +169,8 @@ map("n", "<leader>,", function() p.buffers() end, { desc = "Buffers" })
 map("n", "<leader>fb", function() p.buffers() end, { desc = "Buffers" })
 
 map("n", "<leader>/", function() p.grep({ cwd = root() }) end, { desc = "Grep (root)" })
-map("n", "<leader>sg", function() p.grep({ cwd = root() }) end, { desc = "Grep (root)" })
-map("n", "<leader>sG", function() p.grep() end, { desc = "Grep (cwd)" })
+map("n", "<leader>sg", function() p.grep({ cwd = bufdir() }) end, { desc = "Grep (cwd)" })
+map("n", "<leader>sG", function() p.grep({ cwd = root() }) end, { desc = "Grep (root)" })
 map({ "n", "x" }, "<leader>sw", function() p.grep_word({ cwd = root() }) end, { desc = "Grep word or selection" })
 map("n", "<leader>sb", function() p.lines() end, { desc = "Buffer lines" })
 map("n", "<leader>sB", function() p.grep_buffers() end, { desc = "Grep open buffers" })
