@@ -86,6 +86,10 @@ map("n", "<A-Up>", "<cmd>m .-2<cr>==", { desc = "Move line up" })
 map("n", "<A-Down>", "<cmd>m .+1<cr>==", { desc = "Move line down" })
 map("v", "<A-Up>", ":m '<-2<cr>gv=gv", { desc = "Move selection up" })
 map("v", "<A-Down>", ":m '>+1<cr>gv=gv", { desc = "Move selection down" })
+map("n", "<A-j>", "<cmd>m .+1<cr>==", { desc = "Move line down" })
+map("n", "<A-k>", "<cmd>m .-2<cr>==", { desc = "Move line up" })
+map("v", "<A-j>", ":m '>+1<cr>gv=gv", { desc = "Move selection down" })
+map("v", "<A-k>", ":m '<-2<cr>gv=gv", { desc = "Move selection up" })
 
 -- Indent/dedent with Tab. silent! swallows the error on an empty selection.
 map("v", "<Tab>", function() vim.cmd("silent! normal! >gv") end, { desc = "Indent selection" })
