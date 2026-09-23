@@ -212,15 +212,26 @@ local function close_view()
     local fixed = describe_unblocked(unblock_tabclose())
     table.insert(report, "unblocked: " .. (next(fixed) and table.concat(fixed, ", ") or "nothing"))
 
-    local ok2, err2 = pcall(vim.cmd, "DiffviewClose")
+    -- DiffviewClose cannot be retried: the failed attempt already set
+    -- view.closing, and DiffView:close/FileHistoryView:close are no-ops once
+    -- it is set, so a second call just disposes the view and orphans its tab.
+    -- Finish the teardown the failed call skipped: tabclose, view_closed,
+    -- dispose.
+    local ok2, err2 = pcall(function()
+      if view.tabpage and vim.api.nvim_tabpage_is_valid(view.tabpage) then
+        vim.cmd("tabclose " .. vim.api.nvim_tabpage_get_number(view.tabpage))
+      end
+      DiffviewGlobal.emitter:emit("view_closed", view)
+      require("diffview.lib").dispose_view(view)
+    end)
     table.insert(report, "retry ok=" .. tostring(ok2) .. (ok2 and "" or (" err=" .. tostring(err2))))
 
     local logfile = vim.fs.joinpath(vim.fn.stdpath("state"), "diffview-close-failure.log")
     pcall(vim.fn.writefile, vim.split(table.concat(report, "\n"), "\n"), logfile)
 
-    -- The retry has always succeeded so far, and a wall of text about a
-    -- recovered failure is worse than the failure was. Stay quiet unless the
-    -- view is genuinely still open; the log is there either way.
+    -- A wall of text about a recovered failure is worse than the failure was.
+    -- Stay quiet unless the view is genuinely still open; the log is there
+    -- either way.
     if not ok2 then
       vim.notify(table.concat(report, "\n") .. "\nlogged to " .. logfile, vim.log.levels.ERROR)
     end
