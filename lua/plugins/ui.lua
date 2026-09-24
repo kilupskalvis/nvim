@@ -92,6 +92,8 @@ require("noice").setup({
       ["vim.lsp.util.convert_input_to_markdown_lines"] = true,
       ["vim.lsp.util.stylize_markdown"] = true,
     },
+    -- blink.cmp already shows signature help; two plugins meant two windows.
+    signature = { enabled = false },
   },
   routes = {
     -- "written", "N more lines", "N fewer lines" go to the quiet mini view
@@ -107,6 +109,7 @@ require("noice").setup({
     bottom_search = true,         -- / and ? stay at the bottom like classic vim
     command_palette = true,       -- : cmdline centered with completion popup below
     long_message_to_split = true, -- long output opens in a split instead of hit-enter
+    lsp_doc_border = true,        -- rounded hover border, matching blink's windows
   },
 })
 map("c", "<S-Enter>", function() require("noice").redirect(vim.fn.getcmdline()) end, { desc = "Redirect cmdline output to a split" })
