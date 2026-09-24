@@ -32,7 +32,18 @@ autocmd("FileChangedShellPost", {
   group = augroup("checktime_notify"),
   callback = function(args)
     local name = vim.api.nvim_buf_get_name(args.buf)
-    vim.notify(("Reloaded from disk: %s"):format(vim.fn.fnamemodify(name, ":~:.")), vim.log.levels.INFO)
+    local rel = vim.fn.fnamemodify(name, ":~:.")
+    -- Also fires on every checktime once the file is gone (nvim keeps
+    -- re-checking in case it reappears), so a deleted file is not a reload.
+    if not vim.uv.fs_stat(name) then
+      if not vim.b[args.buf].deleted_notified then
+        vim.b[args.buf].deleted_notified = true
+        vim.notify(("Deleted on disk: %s"):format(rel), vim.log.levels.WARN)
+      end
+      return
+    end
+    vim.b[args.buf].deleted_notified = nil
+    vim.notify(("Reloaded from disk: %s"):format(rel), vim.log.levels.INFO)
   end,
 })
 
